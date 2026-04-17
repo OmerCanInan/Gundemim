@@ -1,4 +1,4 @@
-# Build Trigger: 2026-04-17T17:20 - Enable Releases
+# Build Trigger: 2026-04-17T17:38 - Final Professional Release
 name: "Gündemim Multi-Platform Build"
 
 on:
@@ -38,7 +38,7 @@ jobs:
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-portable-exe
+          name: windows-assets
           path: pack/*.exe
 
   # ==========================================
@@ -60,11 +60,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
-          
-      - name: Java Diagnostics
-        run: |
-          java -version
-          echo "JAVA_HOME: $JAVA_HOME"
           
       - name: Clean Install
         run: |
@@ -91,7 +86,7 @@ jobs:
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-debug-apk
+          name: android-assets
           path: android/app/build/outputs/apk/debug/Gundemim.apk
 
   # ==========================================
@@ -133,3 +128,42 @@ jobs:
                      -configuration Debug \
                      -sdk iphoneos \
                      build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+  # ==========================================
+  # FINAL RELEASE (Combine Everything)
+  # ==========================================
+  publish:
+    needs: [build-windows, build-android, build-ios]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Assets
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-assets
+          path: release-assets
+          
+      - name: Download Android Assets
+        uses: actions/download-artifact@v4
+        with:
+          name: android-assets
+          path: release-assets
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          name: "Gündemim v0.1.0"
+          body: |
+            Gündemim RSS Okuyucu - İlk Profesyonel Yayın! 🚀
+            
+            **Yenilikler:**
+            - "Gündemim" markası ve logosu tüm platformlara eklendi.
+            - Windows için Kurulum (Setup) ve Taşınabilir (Portable) sürümler.
+            - Android için APK dosyası (`Gundemim.apk`).
+            - iOS için altyapı hazırlıkları tamamlandı.
+          files: |
+            release-assets/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
