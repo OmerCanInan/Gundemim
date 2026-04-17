@@ -3,7 +3,7 @@ name: "Gündemim Multi-Platform Build"
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Manuel tetikleme için
+  workflow_dispatch:
 
 jobs:
   # ==========================================
@@ -17,14 +17,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: '22.x'
           
       - name: Check Node Version
         run: node -v
           
-      - name: Install dependencies
-        run: npm install
+      - name: Clean Install
+        run: |
+          if (Test-Path package-lock.json) { Remove-Item package-lock.json }
+          npm install
         
       - name: Build Windows App
         run: npm run pack-win
@@ -48,8 +49,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: '22.x'
           
       - name: Check Node Version
         run: node -v
@@ -60,14 +60,16 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
           
-      - name: Install dependencies
-        run: npm install
+      - name: Clean Install
+        run: |
+          rm -f package-lock.json
+          npm install
         
       - name: Build Web Assets
         run: npm run build
         
       - name: Capacitor Sync Android
-        run: npx cap sync android
+        run: npm run android-sync
         
       - name: Set Executable Permissions for Gradlew
         run: chmod +x android/gradlew
@@ -93,23 +95,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: '22.x'
           
       - name: Check Node Version
         run: node -v
           
-      - name: Install dependencies
-        run: npm install
+      - name: Clean Install
+        run: |
+          rm -f package-lock.json
+          npm install
         
       - name: Build Web Assets
         run: npm run build
         
       - name: Capacitor Sync iOS
-        run: npx cap sync ios
+        run: npm run ios-sync
         
       - name: Build iOS Project
         run: |
           cd ios/App
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos build CODE_SIGNING_ALLOWED=NO
-
