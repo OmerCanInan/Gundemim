@@ -1,0 +1,102 @@
+name: "Gündemim Multi-Platform Build"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Manuel tetikleme için
+
+jobs:
+  # ==========================================
+  # WINDOWS BUILD (Portable EXE)
+  # ==========================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build Windows App
+        run: npm run pack-win
+        
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-exe
+          path: pack/*.exe
+
+  # ==========================================
+  # ANDROID BUILD (APK)
+  # ==========================================
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build Web Assets
+        run: npm run build
+        
+      - name: Capacitor Sync Android
+        run: npx cap sync android
+        
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+        
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  # ==========================================
+  # iOS BUILD (IPA - Archive Only)
+  # ==========================================
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build Web Assets
+        run: npm run build
+        
+      - name: Capacitor Sync iOS
+        run: npx cap sync ios
+        
+      # NOT: Sertifika ve Provisioning Profile olmadan tam IPA oluşturulamaz.
+      # Bu adım projeyi derler ve Xcode projesinin hazır olduğunu doğrular.
+      - name: Build iOS Project
+        run: |
+          cd ios/App
+          xcodebuild -scheme App -destination 'generic/platform=iOS' -allowProvisioningUpdates build

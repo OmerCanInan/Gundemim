@@ -1,112 +1,798 @@
 // src/pages/NewsFeed.jsx
 // RSS Haberlerinin (Sonuçların) listelendiği Ana Ekran.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { fetchRssFeed } from '../services/rssService';
-import { getRssLinks } from '../services/dbService';
+import { fetchRssFeed, generateTags } from '../services/rssService';
+import { getRssLinks, getNewsCache, saveNewsItems, getFilters, saveFilters, getAppSettings } from '../services/dbService';
+import { useRadio } from '../context/RadioContext';
+import { summarizeNewsWithGemini } from '../services/aiService';
 import NewsCard from '../components/NewsCard';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCw, ShieldAlert, Target, Sparkles, Bot, Headphones, Square, Tag } from 'lucide-react';
+
+// Cache'den gelen haberlere her zaman güncel tag kurallarını uygula
+// (TAG_RULES değiştiğinde eski cache'deki yanlış tag'lar düzeltilir)
+const applyTagsToItems = (items) =>
+  items.map(item => ({
+    ...item,
+    tags: generateTags(item.title || '', item.description || '', item.sourceName || '')
+  }));
+
+// Tarih sıralama (Yardımcı fonksiyon)
+const sortNews = (feedData) => {
+  const now = new Date().getTime() + (24 * 60 * 60 * 1000);
+  return feedData.sort((a, b) => {
+    const timeA = a.date.getTime();
+    const timeB = b.date.getTime();
+    const isValidA = !isNaN(timeA) && timeA < now;
+    const isValidB = !isNaN(timeB) && timeB < now;
+    if (!isValidA && !isValidB) return 0;
+    if (!isValidA) return 1;
+    if (!isValidB) return -1;
+    return timeB - timeA;
+  });
+};
 
 export default function NewsFeed() {
   const [searchParams] = useSearchParams();
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // Arka plan yenileme
   const [error, setError] = useState(null);
-  const [visibleCount, setVisibleCount] = useState(150);
+  const [visibleCount, setVisibleCount] = useState(50); // İlk yüklemede performans için 50'ye düşürüldü
+  const [filterForm, setFilterForm] = useState(() => getFilters());
+  const [tagSearch, setTagSearch] = useState(''); // Yazarak etiket araması
+  const [selectedTag, setSelectedTag] = useState('');  // Karta tıklayarak seçilen etiket
+  const [showTagDropdown, setShowTagDropdown] = useState(false); // Dropdown aç/kapat
+  const tagDropdownRef = useRef(null); // Dışarı tıklanınca kapat
+
+  // AI States
+  const [aiSummary, setAiSummary] = useState(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const queryUrl = searchParams.get('url');
   const searchAll = searchParams.get('all') === 'true';
+  const filterYesterday = searchParams.get('filter') === 'yesterday';
+  const targetFolder = searchParams.get('folder'); // Klasör / Etiket desteği
+
+  // Radyo Context
+  const { 
+    isPlaying: isPlayingRadio, 
+    currentIndex: currentPlayingIndex, 
+    startRadio, 
+    stopRadio, 
+    sanitizeForAudio,
+    voiceGender: radioVoiceGender, 
+    setVoiceGender: setRadioVoiceGender,
+    playbackRate
+  } = useRadio();
+
+  // AI Özeti Sesli Okuma State
+  const [isPlayingAiAudio, setIsPlayingAiAudio] = useState(false);
+  const isPlayingAiRef = useRef(false);
+  
+  const googleTtsRef = useRef(null); // AI için yerel audio objesi
+  
+  // AI Modal Menü State
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
+  // Dropdown dışına tıklanınca kapat
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) {
+        setShowTagDropdown(false);
+      }
+    };
+    if (showTagDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showTagDropdown]);
+
+  // AI özetindeki Markdown (kalın yazı ve liste) yapılarını basitçe render eder
+  const formatSummary = (text) => {
+    if (!text) return null;
+    
+    // Markdown renderer basic implementation
+    let formatted = text
+       // Headers (h3, h4)
+       .replace(/^### (.*$)/gm, '<h4 style="color:var(--primary-color); margin:1.5rem 0 0.8rem 0; font-size:1.1rem; border-bottom:1px solid var(--border-color); padding-bottom:0.4rem; font-weight:800; letter-spacing:-0.01em;">$1</h4>')
+       .replace(/^#### (.*$)/gm, '<h5 style="color:var(--text-color); margin:1rem 0 0.5rem 0; font-size:1rem; font-weight:700;">$1</h5>')
+       // Bullets
+       .replace(/^[•\-\*] (.*$)/gm, '<li style="margin-bottom:0.8rem; list-style-type:none; display:flex; gap:0.6rem; line-height:1.5; align-items:flex-start;"><span style="color:var(--primary-color); font-weight:bold; margin-top:2px;">•</span> <span>$1</span></li>')
+       // Bold
+       .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-color); font-weight:700;">$1</strong>')
+       // Habere Git Link (Stylized)
+       .replace(/\[Haber ↗\]\((.*?)\)/g, '<a href="$1" target="_blank" style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; color:#10b981; text-decoration:none; margin-left:8px; opacity:0.8; font-weight:700; border:1px solid rgba(16, 185, 129, 0.4); padding:2px 8px; border-radius:6px; background:rgba(16, 185, 129, 0.05); transition:all 0.2s; white-space:nowrap;">Haber ↗</a>')
+       // Transparent Source
+       .replace(/\{\{(.*?)\}\}/g, '<span style="display:inline-block; font-size:0.75rem; color:var(--text-light); opacity:0.4; margin-left:10px; font-weight:500;">$1</span>')
+       // Source highlight
+       .replace(/(Kaynak: .*$)/gmi, '<em style="display:block; font-size:0.8rem; color:var(--text-light); margin-top:0.2rem; font-style:normal; opacity:0.8;">$1</em>');
+
+    return (
+       <div className="summary-content" style={{ padding: '0.5rem 0' }}>
+          {formatted.split('\n').map((line, i) => (
+             line.trim() ? <div key={i} dangerouslySetInnerHTML={{ __html: line }} /> : null
+          ))}
+       </div>
+    );
+  };
+
+
 
   useEffect(() => {
     const loadNews = async () => {
-      setLoading(true);
-      setError(null);
-      let feedData = [];
+      // 1. ANINDA YÜKLEME (Instant Load from Cache)
+      let cachedData = getNewsCache();
+      
+      // Hangi kategoriye bakıyoruz? Veriyi filtrele:
+      const links = getRssLinks();
+      
+      if (targetFolder) {
+         const allowedUrls = links.filter(l => l.folder === targetFolder).map(l => l.url);
+         cachedData = cachedData.filter(item => allowedUrls.includes(item.sourceUrl));
+      } else if (queryUrl) {
+         cachedData = cachedData.filter(item => item.sourceUrl === queryUrl);
+      } else {
+         // Tüm Haberler veya Dünün Özeti: Yalnızca şuan kayıtlı kaynaklara ait haberleri göster.
+         const allowedUrls = links.map(l => l.url);
+         cachedData = cachedData.filter(item => allowedUrls.includes(item.sourceUrl));
+         
+         // Dünün Özeti filtresi aktifse, sadece "Dün"e ait olanları ayıkla
+         if (filterYesterday) {
+            const now = new Date();
+            const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+            const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - 1;
+            cachedData = cachedData.filter(item => {
+               const time = item.date.getTime();
+               return time >= startOfYesterday && time <= endOfYesterday;
+            });
+         }
+      }
 
+      // Ekrana hemen geçmiş/çevrimdışı veriyi bas — retroaktif tag uygula
+      if (cachedData.length > 0) {
+        setNews(sortNews(applyTagsToItems(cachedData)));
+        setLoading(false); // Cache doluyken ana yükleme ekranını kapat
+      } else {
+        setLoading(true); // Cache boşsa ana yükleme dönsün
+      }
+      
+      setIsRefreshing(true); // Arka plan çekimi başladı
+      setError(null);
+
+      // 2. ARKA PLANDA CANLI GÜNCELLEME (Background Live Fetch)
+      let liveData = [];
       try {
-        if (searchAll) {
-          // Sistemdeki tüm RSS kaynaklarını çek.
-          const links = getRssLinks();
-          if (links.length === 0) {
-            setError("Kayıtlı RSS linki bulunamadı. Lütfen ana sayfaya dönüp link ekleyin.");
+        let linksToFetch = [];
+        
+        if (searchAll || filterYesterday || targetFolder) {
+          linksToFetch = getRssLinks();
+          if (targetFolder) {
+            linksToFetch = linksToFetch.filter(l => l.folder === targetFolder);
+          }
+          
+          if (linksToFetch.length === 0 && cachedData.length === 0) {
+            setError("Bu kategoride kayıtlı RSS linki bulunamadı.");
+            setIsRefreshing(false);
             setLoading(false);
             return;
           }
-          
-          // Çoklu API isteklerini paralel olarak ('Promise.all' ile) yönetiyoruz, performansı maksimize ediyor.
-          const promises = links.map(linkObj => fetchRssFeed(linkObj.url));
+
+          // Çoklu API İstekleri
+          const promises = linksToFetch.map(linkObj => fetchRssFeed(linkObj.url));
           const results = await Promise.allSettled(promises);
           
           results.forEach(res => {
             if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-              feedData = [...feedData, ...res.value];
+              liveData = [...liveData, ...res.value];
             }
           });
-
         } else if (queryUrl) {
-          // Sadece parametre olarak gelen tek URL'yi çekiyoruz
-          feedData = await fetchRssFeed(queryUrl);
-          if (feedData.length === 0) {
-            setError("Bu URL'den herhangi bir haber çekilemedi veya veriler uygun formatta değil.");
+          liveData = await fetchRssFeed(queryUrl);
+          if (liveData.length === 0 && cachedData.length === 0) {
+             setError("Haber çekilemedi veya veriler hatalı.");
           }
         }
 
-        // Mükemmel Tekilleştirme (Deduplication) Adımı:
-        // Farklı kategorilerden veya kaynaklardan gelen tamamen aynı haberleri filtrele
-        const uniqueKeys = new Set();
-        feedData = feedData.filter(item => {
-           // Bazı haber linklerinin sonuna "?utm_source" gibi farklı izleme kodları eklenebilir. 
-           // Farklı linkteymiş gibi davranmasını engellemek için "?" öncesini alıyoruz.
-           const rawLink = item.link && item.link !== '#' ? item.link.split('?')[0] : '';
-           const uniqueKey = item.title.trim().toLowerCase() + "||" + rawLink;
+        // 3. YENİ BİLGİLERİ VERİTABANINA KAYDET VE ÇEK
+        if (liveData.length > 0) {
+           const finalCache = saveNewsItems(liveData); // Otomatik Temizlik ve Tekilleştirme çalışır
            
-           if (uniqueKeys.has(uniqueKey)) {
-              return false; // Aynı haber daha önce eklenmiş, bunu atla.
+           // Listeyi tekrar bulunduğumuz sayfaya göre filtreleyip göster
+           let finalDisplay = finalCache;
+           const currentLinks = getRssLinks(); // Her zaman güncel linkleri referans al
+           
+           if (targetFolder) {
+             const allowedUrls = currentLinks.filter(l => l.folder === targetFolder).map(l => l.url);
+             finalDisplay = finalDisplay.filter(item => allowedUrls.includes(item.sourceUrl));
+           } else if (queryUrl) {
+             finalDisplay = finalDisplay.filter(item => item.sourceUrl === queryUrl);
+           } else {
+             // searchAll veya yesterday durumu için sadece geçerli linklerin haberlerini geçir
+             const allowedUrls = currentLinks.map(l => l.url);
+             finalDisplay = finalDisplay.filter(item => allowedUrls.includes(item.sourceUrl));
+             
+             if (filterYesterday) {
+                const now = new Date();
+                const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+                const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - 1;
+                finalDisplay = finalDisplay.filter(item => {
+                   const time = item.date.getTime();
+                   return time >= startOfYesterday && time <= endOfYesterday;
+                });
+             }
            }
-           uniqueKeys.add(uniqueKey);
-           return true; // Benzersiz haber, listeye dahil et.
-        });
+           
+           setNews(sortNews(applyTagsToItems([...finalDisplay])));
+        }
 
-        // Gelen veriyi Tarihe Göre (En yeniler en üstte) sıralıyoruz.
-        // Hatalı veya gelecekteki (bozuk) tarihleri süzmek için ekstra kontroller:
-        const now = new Date().getTime() + (24 * 60 * 60 * 1000); // Max yarınki tarihe kadar izin ver.
-        feedData.sort((a, b) => {
-          const timeA = a.date.getTime();
-          const timeB = b.date.getTime();
-          
-          const isValidA = !isNaN(timeA) && timeA < now;
-          const isValidB = !isNaN(timeB) && timeB < now;
-
-          if (!isValidA && !isValidB) return 0;
-          if (!isValidA) return 1; // Bozuk veya çok ileri tarihleri en alta at!
-          if (!isValidB) return -1;
-          
-          return timeB - timeA;
-        });
-
-        // Hepsini birden State'e atıyoruz.
-        setNews(feedData);
       } catch (err) {
-        console.error("Haberler yüklenirken ana hata:", err);
-        setError("Haberler yüklenemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.");
+        console.error("Canlı güncellenemedi, offline gösteriliyor", err);
+        if (cachedData.length === 0) {
+          setError("Bağlantı hatası. Çevrimdışı sürümde de haber bulunamadı.");
+        }
       } finally {
+        setIsRefreshing(false);
         setLoading(false);
       }
     };
 
     loadNews();
-  }, [queryUrl, searchAll]);
+  }, [queryUrl, searchAll, filterYesterday, targetFolder]);
+
+  // Klasör / Kategori değiştiğinde AI özetini sıfırla (Eski özetin kalmaması için)
+  useEffect(() => {
+    setAiSummary(null);
+    setAiError(null);
+    setIsAiLoading(false);
+  }, [queryUrl, searchAll, filterYesterday, targetFolder]);
+
+  // Klasör, Tümü veya Tekil başlık seçimi
+  let pageTitle = 'Arama Sonuçları';
+  if (searchAll) pageTitle = 'Tüm Haberler';
+  if (filterYesterday) pageTitle = 'Dünün Özeti';
+  if (targetFolder) pageTitle = `Klasör: ${targetFolder}`;
+
+  const handleFilterChange = (type, value) => {
+    const newFilters = { ...filterForm, [type]: value };
+    setFilterForm(newFilters);
+    saveFilters(newFilters);
+  };
+
+  // Tag'a tıklanınca: aynı tag tekrar tıklanırsa filtre kalkar (toggle)
+  const handleTagClick = (tag) => {
+    const normalizedTag = tag.toLowerCase().trim();
+    setSelectedTag(prev => (prev.toLowerCase() === normalizedTag ? '' : normalizedTag));
+    setTagSearch('');
+    // Sayfanın başına scroll yap ki chip görünsün
+    const scrollContainer = document.querySelector('.main-content');
+    if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getFilteredNews = () => {
+    let result = news;
+    const bList = filterForm.blacklist.split(',').map(w => w.trim().toLowerCase()).filter(w => w);
+    const wList = filterForm.whitelist.split(',').map(w => w.trim().toLowerCase()).filter(w => w);
+
+    if (bList.length > 0) {
+      result = result.filter(item => {
+        const title = (item.title || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        return !bList.some(bw => title.includes(bw) || desc.includes(bw));
+      });
+    }
+
+    if (wList.length > 0) {
+      result = result.filter(item => {
+        const title = (item.title || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        return wList.some(ww => title.includes(ww) || desc.includes(ww));
+      });
+    }
+
+    // Karta tıklayarak seçilen tag — case-insensitive tam eşleşme
+    if (selectedTag) {
+      const sel = selectedTag.toLowerCase();
+      result = result.filter(item =>
+        Array.isArray(item.tags) && item.tags.some(t => t.toLowerCase() === sel)
+      );
+    } else if (tagSearch.trim()) {
+      // Yazarak arama (kısmi eşleşme)
+      const ts = tagSearch.trim().toLowerCase();
+      result = result.filter(item =>
+        Array.isArray(item.tags) && item.tags.some(t => t.toLowerCase().includes(ts))
+      );
+    }
+
+    return result;
+  };
+
+  const displayedNews = getFilteredNews();
+
+  const handleGenerateSummary = async () => {
+    setIsAiLoading(true);
+    setAiError(null);
+    setAiSummary(null);
+    try {
+      const summaryText = await summarizeNewsWithGemini(displayedNews, pageTitle);
+      setAiSummary(summaryText);
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleOpenAiModal = () => {
+     setIsAiModalOpen(true);
+     // Eğer daha önce özet çıkarılmamışsa modal açılınca otomatik üretmeye başlasın
+     if (!aiSummary && !aiError && !isAiLoading) {
+         handleGenerateSummary();
+     }
+  };
+
+  const handleCloseAiModal = () => {
+    setIsAiModalOpen(false);
+    if (isPlayingAiAudio) {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (googleTtsRef.current) { 
+          googleTtsRef.current.pause(); 
+          googleTtsRef.current.src = ""; 
+          googleTtsRef.current = null; 
+        }
+        setIsPlayingAiAudio(false);
+        isPlayingAiRef.current = false;
+    }
+  };
+
+  // --- RADYO MANTIĞI (GLOBAL CONTEXT'E BAĞLI) ---
+  const handleToggleRadio = () => {
+    if (isPlayingRadio) {
+      stopRadio();
+    } else {
+      if (displayedNews.length === 0) return;
+      
+      // AI okumasını durdur (Eğer varsa)
+      if (isPlayingAiAudio) {
+        setIsPlayingAiAudio(false);
+        isPlayingAiRef.current = false;
+        if (googleTtsRef.current) {
+          googleTtsRef.current.pause();
+          googleTtsRef.current.src = "";
+        }
+      }
+      
+      startRadio(displayedNews, 0);
+    }
+  };
+
+  // --- AI ÖZETİ SESLİ OKUMA ---
+  const handleToggleAiAudio = () => {
+    const hasSpeech = 'speechSynthesis' in window;
+    const hasAudio = typeof Audio !== 'undefined';
+
+    if (!hasSpeech && !hasAudio) {
+        alert("Cihazınız sesli okumayı desteklemiyor.");
+        return;
+    }
+
+    if (isPlayingAiAudio) {
+       isPlayingAiRef.current = false;
+       if (hasSpeech) window.speechSynthesis.cancel();
+       if (googleTtsRef.current) { googleTtsRef.current.pause(); googleTtsRef.current.src = ""; googleTtsRef.current = null; }
+       setIsPlayingAiAudio(false);
+    } else {
+       if (!aiSummary) return;
+       
+       // Global Radyo'yu durdur
+       if (isPlayingRadio) stopRadio();
+
+       isPlayingAiRef.current = true;
+
+       // SES KİLİDİNİ AÇMA (Mobile Audio Unlock)
+       if (hasAudio) {
+         const unlockAudio = new Audio();
+         unlockAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhAAWAAWAnYmF0YQAAAAA=";
+         unlockAudio.play().catch(() => {});
+         googleTtsRef.current = unlockAudio;
+       }
+
+       // Eğer seçilen ses erkekse ve sistemde destek yoksa otomatik kadına geç
+       if (radioVoiceGender === 'male' && !hasSpeech) {
+          setRadioVoiceGender('female');
+       }
+
+       setIsPlayingAiAudio(true);
+       
+       // Context'ten gelen sanitizeForAudio'yu kullan
+       const audioText = sanitizeForAudio(aiSummary);
+       
+       if (radioVoiceGender === 'female') {
+         // Google Translate TTS — kadın sesi
+         const chunks = [];
+         let remaining = audioText;
+         while (remaining.length > 0) {
+           if (remaining.length <= 200) { chunks.push(remaining); break; }
+           let cutAt = remaining.lastIndexOf(' ', 200);
+           if (cutAt <= 0) cutAt = 200;
+           chunks.push(remaining.substring(0, cutAt));
+           remaining = remaining.substring(cutAt).trim();
+         }
+         
+         let ci = 0;
+         const playChunk = () => {
+           if (!isPlayingAiRef.current || ci >= chunks.length) { setIsPlayingAiAudio(false); isPlayingAiRef.current = false; return; }
+           const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunks[ci])}&tl=tr&client=tw-ob`;
+           const audio = new Audio(url); 
+           audio.playbackRate = playbackRate;
+           googleTtsRef.current = audio;
+           audio.onended = () => { if (isPlayingAiRef.current) { ci++; playChunk(); } };
+           audio.onerror = () => { setIsPlayingAiAudio(false); isPlayingAiRef.current = false; };
+           audio.play().catch(() => { setIsPlayingAiAudio(false); isPlayingAiRef.current = false; });
+         };
+         playChunk();
+       } else {
+         // Erkek — yerel Tolga
+         const utterance = new SpeechSynthesisUtterance(audioText);
+         utterance.lang = 'tr-TR';
+         utterance.rate = playbackRate;
+         utterance.pitch = 0.9;
+         
+         const voices = window.speechSynthesis.getVoices();
+         const trVoice = voices.find(v => v.lang.startsWith('tr'));
+         if (trVoice) utterance.voice = trVoice;
+         
+         utterance.onend = () => setIsPlayingAiAudio(false);
+         utterance.onerror = () => setIsPlayingAiAudio(false);
+         
+         window.speechSynthesis.speak(utterance);
+       }
+    }
+  };
+
+
+
+
 
   return (
     <div className="news-feed-container">
-      <div className="feed-header fade-in">
-        <Link to="/" className="btn-back">
-          <ArrowLeft size={18} /> Ana Sayfaya Dön
-        </Link>
-        <h2 className="page-title">
-          {searchAll ? 'Ortak Haber Akışı (Tüm Kaynaklar)' : 'Arama Sonuçları'} {news.length > 0 && `(${news.length} Haber)`}
-        </h2>
+      <div className="feed-header fade-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <Link to="/" className="btn-back">
+            <ArrowLeft size={18} /> Geri Dön
+          </Link>
+          <h2 className="page-title" style={{ marginTop: '0.5rem' }}>
+            {pageTitle} {news.length > 0 && `(${news.length})`}
+          </h2>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {isRefreshing && (
+            <div style={{ color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+              <RefreshCw size={16} className="spinner" /> Güncelleniyor
+            </div>
+          )}
+          
+          <button 
+            onClick={handleOpenAiModal}
+            title="Haberlerin yapay zeka özetini okuyun"
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              color: '#10b981', 
+              border: '1px solid rgba(16, 185, 129, 0.4)', 
+              cursor: 'pointer', transition: 'all 0.3s ease', fontWeight: '600', fontSize: '0.9rem', zIndex: 5
+            }}
+          >
+            <Bot size={18} />
+            AI Özeti 
+          </button>
+
+          <button 
+            onClick={handleToggleRadio}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '8px',
+              background: isPlayingRadio ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-secondary)',
+              color: isPlayingRadio ? '#ff8a8a' : 'var(--text-color)', 
+              border: isPlayingRadio ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)', 
+              boxShadow: isPlayingRadio ? '0 0 12px rgba(239, 68, 68, 0.15)' : 'none',
+              cursor: 'pointer', transition: 'all 0.3s ease', fontWeight: '600', fontSize: '0.9rem', zIndex: 5
+            }}
+          >
+            {isPlayingRadio ? <Square size={16} fill="currentColor" /> : <Headphones size={18} />}
+            {isPlayingRadio ? 'Radyoyu Kapat' : 'Radyo Dinle'}
+          </button>
+
+          {/* Ses Cinsiyet Seçimi */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ 
+              display: 'flex', alignItems: 'center', gap: 0,
+              borderRadius: '8px', overflow: 'hidden',
+              border: '1px solid var(--border-color)',
+            }}>
+              <button
+                onClick={() => setRadioVoiceGender('female')}
+                title="Kadın Sesi"
+                style={{
+                  padding: '0.5rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem',
+                  border: 'none', transition: 'all 0.2s',
+                  background: radioVoiceGender === 'female' ? 'rgba(236,72,153,0.15)' : 'var(--bg-secondary)',
+                  color: radioVoiceGender === 'female' ? '#f9a8d4' : 'var(--text-light)',
+                  borderRight: '1px solid var(--border-color)',
+                }}
+              >
+                ♀ Kadın
+              </button>
+              <button
+                onClick={() => setRadioVoiceGender('male')}
+                title="Erkek Sesi (Beta)"
+                style={{
+                  padding: '0.5rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem',
+                  border: 'none', transition: 'all 0.2s',
+                  background: radioVoiceGender === 'male' ? 'rgba(59,130,246,0.15)' : 'var(--bg-secondary)',
+                  color: radioVoiceGender === 'male' ? '#93c5fd' : 'var(--text-light)',
+                }}
+              >
+                ♂ Erkek <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>(Beta)</span>
+              </button>
+            </div>
+            <div style={{ 
+              position: 'absolute', bottom: '-1.1rem', left: '50%', transform: 'translateX(-50%)',
+              fontSize: '0.6rem', color: 'var(--text-light)', opacity: 0.5, whiteSpace: 'nowrap' 
+            }}>
+               * Bazı cihazlarda desteklenmeyebilir.
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Kelime Filtreleri Alanı — ref ile dropdown click-outside */}
+      <div ref={tagDropdownRef} style={{ position: 'relative' }}>
+      <div className="fade-in" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+        <div style={{ flex: '1 1 250px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--danger-color)', fontWeight: '600' }}>
+            <ShieldAlert size={16} /> Sessize Alınanlar
+          </label>
+          <input 
+            type="text" 
+            placeholder="Virgülle ayırın (Örn: kaza, kriz)"
+            value={filterForm.blacklist}
+            onChange={(e) => handleFilterChange('blacklist', e.target.value)}
+            style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-color)', color: 'var(--text-color)', borderRadius: '6px', fontSize: '0.9rem' }}
+          />
+        </div>
+        <div style={{ flex: '1 1 250px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--primary-color)', fontWeight: '600' }}>
+            <Target size={16} /> Odak Kelimeler
+          </label>
+          <input 
+            type="text" 
+            placeholder="Virgülle ayırın (Örn: yapay zeka, spor)"
+            value={filterForm.whitelist}
+            onChange={(e) => handleFilterChange('whitelist', e.target.value)}
+            style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-color)', color: 'var(--text-color)', borderRadius: '6px', fontSize: '0.9rem' }}
+          />
+        </div>
+        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--success-color)', fontWeight: '600' }}>
+            <Tag size={16} /> Etiket Filtresi
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Aktif tag varsa chip göster */}
+            {selectedTag && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '0.4rem 0.9rem', borderRadius: '20px', fontSize: '0.85rem',
+                fontWeight: '700', background: 'rgba(16,185,129,0.15)',
+                color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.4)',
+                letterSpacing: '0.04em', flexShrink: 0,
+              }}>
+                {selectedTag}
+                <button
+                  onClick={() => { setSelectedTag(''); setTagSearch(''); }}
+                  style={{ background: 'none', border: 'none', color: '#6ee7b7', cursor: 'pointer', padding: '0', lineHeight: 1, fontSize: '1rem', display: 'flex', alignItems: 'center' }}
+                >✕</button>
+              </span>
+            )}
+            {/* Dropdown aç/kapat butonu */}
+            <button
+              onClick={() => setShowTagDropdown(p => !p)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '0.6rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: '600',
+                border: showTagDropdown ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
+                background: showTagDropdown ? 'rgba(16,185,129,0.1)' : 'var(--bg-color)',
+                color: showTagDropdown ? 'var(--success-color)' : 'var(--text-color)',
+                transition: 'all 0.18s ease', whiteSpace: 'nowrap',
+              }}
+            >
+              <Tag size={14} /> Etiketler {showTagDropdown ? '▲' : '▼'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── DROPDOWN PANEL ── — filter alanının altında açılır */}
+      {showTagDropdown && news.length > 0 && (() => {
+        const tagFreq = {};
+        news.forEach(item => {
+          if (Array.isArray(item.tags)) {
+            item.tags.forEach(t => {
+              const normalized = t.toLowerCase();
+              tagFreq[normalized] = (tagFreq[normalized] || 0) + 1;
+            });
+          }
+        });
+        const allTags = Object.entries(tagFreq).sort((a,b) => b[1]-a[1]).map(([t]) => t);
+        const TAG_COLORS = [
+          { bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.5)', text: '#a5b4fc' },
+          { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.4)', text: '#6ee7b7' },
+          { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', text: '#fcd34d' },
+          { bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.4)',  text: '#fca5a5' },
+          { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.4)', text: '#93c5fd' },
+          { bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.4)', text: '#d8b4fe' },
+          { bg: 'rgba(236,72,153,0.12)', border: 'rgba(236,72,153,0.4)', text: '#f9a8d4' },
+          { bg: 'rgba(20,184,166,0.12)', border: 'rgba(20,184,166,0.4)', text: '#5eead4' },
+          { bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.4)', text: '#fdba74' },
+          { bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.4)',  text: '#86efac' },
+        ];
+        const getColor = (tag) => {
+          let hash = 0;
+          for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+          return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+        };
+        return (
+          <div className="fade-in" style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 300,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '10px',
+            padding: '1rem',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(10px)',
+            marginBottom: '1rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--success-color)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Tag size={14} /> Etiket Seç <span style={{ color: 'var(--text-light)', fontWeight: '400' }}>({allTags.length} etiket)</span>
+              </span>
+              <button onClick={() => setShowTagDropdown(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.1rem', padding: '0 4px' }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
+              {/* Tümü */}
+              <button
+                onClick={() => { setSelectedTag(''); setTagSearch(''); setShowTagDropdown(false); }}
+                style={{
+                  padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
+                  fontSize: '0.8rem', fontWeight: '700', textAlign: 'left',
+                  border: !selectedTag && !tagSearch ? '1px solid rgba(255,255,255,0.5)' : '1px solid var(--border-color)',
+                  background: !selectedTag && !tagSearch ? 'rgba(255,255,255,0.12)' : 'var(--bg-color)',
+                  color: 'var(--text-color)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span>🗂 Tümü</span>
+                <span style={{ fontSize: '0.72rem', opacity: 0.6, background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '8px' }}>{news.length}</span>
+              </button>
+
+              {allTags.map(tag => {
+                const color = getColor(tag);
+                const isActive = selectedTag.toLowerCase() === tag.toLowerCase();
+                const count = tagFreq[tag];
+                const emoji = {
+                  '#oyun': '🎮', '#teknoloji': '💻', '#ekonomi': '📈',
+                  '#spor': '⚽', '#dünya': '🌍', '#türkiye': '🇹🇷',
+                  '#bilim': '🔬', '#sağlık': '🏥', '#otomobil': '🚗',
+                  '#yapay-zeka': '🤖', '#kripto': '₿', '#sinema-tv': '🎬',
+                  '#yaşam': '🌿', '#iş-dünyası': '💼', '#genel': '📰',
+                }[tag] || '🏷';
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => { handleTagClick(tag); setShowTagDropdown(false); }}
+                    style={{
+                      padding: '8px 12px', borderRadius: '8px', cursor: 'pointer',
+                      fontSize: '0.8rem', fontWeight: '700', textAlign: 'left',
+                      border: `1px solid ${isActive ? color.text : color.border}`,
+                      background: isActive ? color.text : color.bg,
+                      color: isActive ? '#0f172a' : color.text,
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      boxShadow: isActive ? `0 0 12px ${color.border}` : 'none',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span>{emoji} {tag}</span>
+                    <span style={{ fontSize: '0.72rem', background: isActive ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)', padding: '1px 6px', borderRadius: '8px' }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.7rem', color: 'var(--text-light)', opacity: 0.5, textAlign: 'center', fontStyle: 'italic' }}>
+              ⚠ Beta — Etiketler anahtar kelime tabanlıdır ve tüm haberleri tam olarak kapsamayabilir.
+            </p>
+          </div>
+        );
+      })()}
+      </div>
+
+      {/* AI ÖZET MODALI */}
+      {isAiModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem'
+        }} onClick={handleCloseAiModal}>
+          <div className="fade-in" style={{
+            background: 'var(--bg-color)', width: '100%', maxWidth: '700px', maxHeight: '85vh',
+            borderRadius: '16px', border: '1px solid var(--border-color)', overflowY: 'auto',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column'
+          }} onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(145deg, var(--bg-secondary) 0%, rgba(16, 185, 129, 0.05) 100%)' }}>
+               <div>
+                  <h3 style={{ margin: '0 0 0.2rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontSize: '1.2rem' }}>
+                    <Sparkles size={20} /> Yapay Zeka Özeti
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>Listedeki {displayedNews.length} habere göre hazırlanıyor...</p>
+               </div>
+               
+               <div style={{ display: 'flex', gap: '0.5rem' }}>
+                   {!isAiLoading && !aiError && aiSummary && (
+                       <button
+                         onClick={handleToggleAiAudio}
+                         style={{
+                           display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.8rem', borderRadius: '8px',
+                           background: isPlayingAiAudio ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-color)',
+                           color: isPlayingAiAudio ? 'var(--danger-color)' : 'var(--text-color)', 
+                           border: isPlayingAiAudio ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-color)',
+                           cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.85rem', fontWeight: '600'
+                         }}
+                       >
+                         {isPlayingAiAudio ? <Square size={14} fill="currentColor" /> : <Headphones size={14} />}
+                         {isPlayingAiAudio ? 'Okumayı Durdur' : 'Sesli Dinle'}
+                       </button>
+                   )}
+                   <button onClick={handleCloseAiModal} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                      Kapat
+                   </button>
+               </div>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '2rem' }}>
+               {isAiLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 0', color: 'var(--text-light)' }}>
+                     <Loader2 size={40} className="spinner" style={{ marginBottom: '1rem', color: '#10b981' }} />
+                     <p>Yapay Zeka (Groq) haberleri analiz ediyor...</p>
+                  </div>
+               ) : aiError ? (
+                  <div style={{ color: 'var(--danger-color)', display: 'flex', gap: '0.8rem', alignItems: 'flex-start', fontSize: '1rem', background: 'rgba(239, 68, 68, 0.05)', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    <ShieldAlert size={24} style={{ flexShrink: 0 }} />
+                    <p style={{ margin: 0, lineHeight: '1.5' }}>{aiError}</p>
+                  </div>
+               ) : aiSummary ? (
+                  <div style={{ color: 'var(--text-color)', lineHeight: '1.8', fontSize: '1.05rem' }}>
+                    {formatSummary(aiSummary)}
+                  </div>
+               ) : (
+                  <div style={{ textAlign: 'center' }}>
+                     <button onClick={handleGenerateSummary} className="btn btn-primary" style={{ background: '#10b981', border: 'none', padding: '0.8rem 2rem', fontSize: '1.1rem' }}>
+                        Yeniden Özet Çıkart
+                     </button>
+                  </div>
+               )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+
+
 
       {loading ? (
         <div className="loading-state fade-in">
@@ -118,20 +804,41 @@ export default function NewsFeed() {
           <p>{error}</p>
         </div>
       ) : (
-        <div className="news-list-container">
-          <div className="news-grid">
-            {news.slice(0, visibleCount).map((item) => (
-              <NewsCard key={item.id} news={item} />
-            ))}
-          </div>
-          {visibleCount < news.length && (
+        <div className="news-list-container fade-in">
+          {displayedNews.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-light)', marginTop: '4rem', padding: '2rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+               <h3 style={{ marginBottom: '1rem', color: 'var(--text-color)' }}>{news.length > 0 ? "Filtrenize uygun haber bulunamadı" : "Henüz haber bulunmuyor"}</h3>
+               <p>{news.length > 0 ? "Lütfen Kara Liste veya Odak Kelimeler listenizi kontrol edin." : "Bu kategorideki kaynaklarda güncel bir haber bulunamadı. (Sistem, eski haberleri temizleme kuralı gereği son 7 günden eski haberleri göstermez)."}</p>
+            </div>
+          ) : (
+            <div className="news-grid">
+              {displayedNews.slice(0, visibleCount).map((item, index) => (
+                <div key={item.id} style={{
+                  position: 'relative',
+                  borderRadius: '12px',
+                  boxShadow: isPlayingRadio && currentPlayingIndex === index ? '0 0 0 3px var(--primary-color)' : 'none',
+                  transform: isPlayingRadio && currentPlayingIndex === index ? 'scale(1.02)' : 'scale(1)',
+                  transition: 'all 0.3s ease-in-out',
+                  zIndex: isPlayingRadio && currentPlayingIndex === index ? 10 : 1
+                }}>
+                  {isPlayingRadio && currentPlayingIndex === index && (
+                    <div style={{ position: 'absolute', top: '-10px', left: '-10px', background: 'var(--primary-color)', color: 'white', padding: '0.2rem 0.5rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', zIndex: 11, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Headphones size={12} /> Okunuyor
+                    </div>
+                  )}
+                  <NewsCard news={item} onTagClick={handleTagClick} activeTag={selectedTag} />
+                </div>
+              ))}
+            </div>
+          )}
+          {visibleCount < displayedNews.length && (
             <div className="load-more-container" style={{ textAlign: 'center', margin: '2rem 0' }}>
               <button 
                 onClick={() => setVisibleCount(prev => prev + 50)} 
                 className="btn btn-primary"
                 style={{ padding: '0.8rem 2rem', fontSize: '1.1rem' }}
               >
-                Daha Fazla Göster ({news.length - visibleCount} kaldı)
+                Daha Fazla Göster
               </button>
             </div>
           )}
@@ -140,3 +847,4 @@ export default function NewsFeed() {
     </div>
   );
 }
+

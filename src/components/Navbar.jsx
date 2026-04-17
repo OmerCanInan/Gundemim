@@ -1,30 +1,36 @@
 // src/components/Navbar.jsx
-// Üst bar. Kullanıcının "Otomatik Türkçe'ye Çevir" tercihini değiştiren Toggle butonu burada bulunuyor.
+// Üst bar. Uygulama adı ve çeviri butonu.
 import { useTranslation } from '../context/TranslationContext';
-import { Rss, Languages } from 'lucide-react';
+import { Newspaper, Languages, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export default function Navbar() {
+export default function Navbar({ toggleSidebar }) {
   const { isTranslationEnabled, toggleTranslation } = useTranslation();
 
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to="/" className="navbar-logo">
-          <div className="logo-icon">
-            <Rss size={24} color="#FFF" />
-          </div>
-          <h1>Rss Hub</h1>
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button className="mobile-menu-toggle" onClick={toggleSidebar}>
+            <Menu size={24} />
+          </button>
+          <Link to="/" className="navbar-logo" style={{ gap: '0.5rem' }}>
+            <div className="logo-icon">
+              <Newspaper size={24} color="var(--success-color)" />
+            </div>
+            <h1>Gündemim</h1>
+          </Link>
+        </div>
         
         <div className="navbar-actions">
+
           <button 
             className={`toggle-button ${isTranslationEnabled ? 'active' : ''}`}
             onClick={toggleTranslation}
             aria-pressed={isTranslationEnabled}
           >
             <Languages size={18} />
-            <span>Otomatik Çeviri: {isTranslationEnabled ? 'AÇIK' : 'KAPALI'}</span>
+            <span>Çeviri: {isTranslationEnabled ? 'AÇIK' : 'KAPALI'}</span>
           </button>
         </div>
       </div>

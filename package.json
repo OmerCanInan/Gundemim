@@ -1,11 +1,11 @@
 {
-  "name": "rss-okuyucu",
+  "name": "gundemim",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "main": "electron.cjs",
   "scripts": {
-    "dev-react": "vite",
+    "dev-react": "vite --host",
     "dev-electron": "cross-env IS_DEV=true wait-on http://localhost:5173 && electron .",
     "dev": "concurrently \"npm run dev-react\" \"npm run dev-electron\"",
     "build": "vite build",
@@ -13,13 +13,14 @@
     "pack-win": "npm run build && electron-builder --win"
   },
   "build": {
-    "appId": "com.rssokuyucu.app",
-    "productName": "Rss Hub",
+    "appId": "com.gundemim.app",
+    "productName": "Gundemim",
     "directories": {
       "output": "pack"
     },
     "win": {
-      "target": "nsis"
+      "target": ["nsis", "portable"],
+      "icon": "resources/icon.png"
     },
     "files": [
       "dist/**/*",
@@ -27,6 +28,9 @@
     ]
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
     "jsdom": "^29.0.2",
     "lucide-react": "^1.8.0",
     "react": "^19.2.4",
@@ -35,6 +39,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.0",
     "@electron/packager": "^19.1.0",
     "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",

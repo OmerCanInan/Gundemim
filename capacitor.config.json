@@ -1,0 +1,10 @@
+{
+  "appId": "com.gundemim.app",
+  "appName": "Gundemim",
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

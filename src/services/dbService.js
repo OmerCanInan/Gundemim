@@ -1,13 +1,25 @@
 // src/services/dbService.js
 // Uygulamamızda veritabanı olarak şimdilik LocalStorage kullanıyoruz.
-// Clean Architecture prensiplerine uymak için veritabanı işlemlerini bu serviste soyutladık (abstract ettik).
-// Yarın SQLite veya IndexDB'ye geçmek istersek sadece bu dosyayı değiştirmemiz yeterli olacak.
+// Clean Architecture prensiplerine uymak için veritabanı işlemlerini bu serviste soyutladık.
 
 const DB_KEY = 'rss_links_db';
+const NEWS_CACHE_KEY = 'rss_news_cache';
+const CACHE_RETENTION_DAYS = 7; // Yasal limit: 7 günden eski haberleri otomatik siler.
+
+/**
+ * Benzersiz ID üretici (Modern tarayıcı yoksa fallback kullanır)
+ */
+export const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: Saniye + Rastgele karakterler
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
 
 /**
  * Veritabanından tüm RSS linklerini getirir.
- * @returns {Array<{id: string, url: string, addedAt: string}>} RSS link objeleri
+ * @returns {Array<{id: string, url: string, addedAt: string, folder: string}>} RSS link objeleri
  */
 export const getRssLinks = () => {
   try {
@@ -22,31 +34,151 @@ export const getRssLinks = () => {
 /**
  * Veritabanına yeni bir RSS linki ekler. Aynı URL varsa eklemez.
  * @param {string} url - RSS bağlantısı
+ * @param {string} folder - (Opsiyonel) Klasör / Etiket adı
  * @returns {Object} Eklenen RSS link objesi veya var olan
  */
-export const addRssLink = (url) => {
+export const addRssLink = (url, folder = '') => {
   const links = getRssLinks();
-  const existing = links.find(link => link.url === url);
+  const safeFolder = folder.trim();
+  const existing = links.find(link => link.url === url && link.folder === safeFolder);
   
-  if (existing) return existing;
+  if (existing) return false;
 
   const newLink = {
-    id: crypto.randomUUID(), // Benzersiz ID
+    id: generateUUID(),
     url,
-    addedAt: new Date().toISOString() // Sistemde tarihlerin standart tutulması (ISO 8601)
+    folder: safeFolder, // Klasör / Etiket desteği eklendi
+    addedAt: new Date().toISOString()
   };
 
   links.push(newLink);
   localStorage.setItem(DB_KEY, JSON.stringify(links));
+  window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
   return newLink;
 };
 
 /**
  * ID'si verilen RSS linkini veritabanından siler.
- * @param {string} id - Silinecek linkin ID'si
  */
 export const deleteRssLink = (id) => {
   let links = getRssLinks();
   links = links.filter(link => link.id !== id);
   localStorage.setItem(DB_KEY, JSON.stringify(links));
+  window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
 };
+
+// ==========================================
+// HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI
+// ==========================================
+
+export const getNewsCache = () => {
+  try {
+    const data = localStorage.getItem(NEWS_CACHE_KEY);
+    let cached = data ? JSON.parse(data) : [];
+    // Tarih string'lerini anında JS Date objelerine dönüştür
+    cached = cached.map(item => {
+      item.date = new Date(item.date);
+      return item;
+    });
+    return cached;
+  } catch (error) {
+    console.error('Haber önbelleği okunamadı:', error);
+    return [];
+  }
+};
+
+/**
+ * Yeni çekilen canlı feed'leri alır, eskileri ve tekrarları atarak LocalStorage'a kaydeder.
+ * Bu fonksiyon "Otomatik Temizlik (Garbage Collection)" içerir.
+ */
+export const saveNewsItems = (newItems) => {
+  let cached = getNewsCache();
+  
+  // 1. ÇÖP TOPLAYICI (Garbage Collection): 7 Günden eski cache'leri hukuken ve depolama için at.
+  const cutoffTime = new Date().getTime() - (CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  cached = cached.filter(item => {
+      const itemTime = item.date.getTime();
+      return itemTime > cutoffTime;
+  });
+
+  // 2. Mükemmel Tekilleştirme Cihazı (Hızlı arama için Set/Map kullanımı)
+  const cacheMap = new Map();
+  cached.forEach(i => {
+     const rawLink = i.link && i.link !== '#' ? i.link.split('?')[0] : '';
+     cacheMap.set(i.title.trim().toLowerCase() + "||" + rawLink, true);
+  });
+
+  // 3. Yeni gelenler arasından sadece "daha önce eklenmemiş" olanları filtrele
+  const itemsToAdd = newItems.filter(item => {
+      let time = item.date.getTime();
+      if (isNaN(time)) time = new Date().getTime(); // Bozuk tarih koruması
+      
+      // Çok eski bir haberi hiç veritabanına sokma
+      if (time <= cutoffTime) return false; 
+      
+      const rawLink = item.link && item.link !== '#' ? item.link.split('?')[0] : '';
+      const uniqueKey = item.title.trim().toLowerCase() + "||" + rawLink;
+      
+      if (cacheMap.has(uniqueKey)) return false;
+      
+      cacheMap.set(uniqueKey, true);
+      return true;
+  });
+
+  // 4. Yeni taze haberleri en üste (başa) ekle
+  cached = [...itemsToAdd, ...cached];
+
+  // 5. Kaydet (Tarihler string'e dönüşecek)
+  localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
+  
+  return cached; // Tekrar UI'a geri ver
+};
+
+// ==========================================
+// KELİME FİLTRELERİ (Kara Liste & Altın Kelime)
+// ==========================================
+export const getFilters = () => {
+  try {
+    const data = localStorage.getItem('rss_word_filters');
+    return data ? JSON.parse(data) : { blacklist: '', whitelist: '' };
+  } catch (error) {
+    return { blacklist: '', whitelist: '' };
+  }
+};
+
+export const saveFilters = (filters) => {
+  localStorage.setItem('rss_word_filters', JSON.stringify(filters));
+  window.dispatchEvent(new Event('rss_filters_updated')); // Dinamik Güncelleme
+};
+
+// ==========================================
+// YAPAY ZEKA (AI) AYARLARI (GROQ)
+// ==========================================
+export const getGroqApiKey = () => {
+  return localStorage.getItem('rss_groq_api_key') || '';
+};
+
+export const saveGroqApiKey = (key) => {
+  if (key && key.trim()) {
+    localStorage.setItem('rss_groq_api_key', key.trim());
+  } else {
+    localStorage.removeItem('rss_groq_api_key');
+  }
+};
+
+// ==========================================
+// GÖRÜNÜM & SEKME AYARLARI
+// ==========================================
+export const getAppSettings = () => {
+  try {
+    const data = localStorage.getItem('rss_app_settings');
+    return data ? JSON.parse(data) : { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0 };
+  } catch {
+    return { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0 };
+  }
+};
+
+export const saveAppSettings = (settings) => {
+  localStorage.setItem('rss_app_settings', JSON.stringify(settings));
+};
+
