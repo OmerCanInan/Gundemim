@@ -1,4 +1,4 @@
-# Build Trigger: 2026-04-17T15:05
+# Build Trigger: 2026-04-17T15:30
 name: "Gündemim Multi-Platform Build"
 
 on:
@@ -15,21 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js (Force 22)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.13.1'
-          check-latest: true
-          
-      - name: Environment Diagnostics
-        run: |
-          node -v
-          npm -v
-          echo "Path: $env:Path"
+          node-version: '22'
           
       - name: Clean Install
+        shell: powershell
         run: |
-          if (Test-Path package-lock.json) { Remove-Item package-lock.json }
+          if (Test-Path package-lock.json) { Remove-Item package-lock.json -Force }
           npm install
         
       - name: Build Windows App
@@ -49,17 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js (Force 22)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.13.1'
-          check-latest: true
-          
-      - name: Environment Diagnostics
-        run: |
-          node -v
-          npm -v
-          
+          node-version: '22'
+      
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -75,9 +63,9 @@ jobs:
         run: npm run build
         
       - name: Capacitor Sync Android
-        run: npm run android-sync
+        run: npx cap sync android
         
-      - name: Set Executable Permissions for Gradlew
+      - name: Set Executable Permissions
         run: chmod +x android/gradlew
         
       - name: Build Android APK
@@ -91,23 +79,17 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
   # ==========================================
-  # iOS BUILD (IPA - Preparation Only)
+  # iOS BUILD (Preparation & Build Check)
   # ==========================================
   build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js (Force 22)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.13.1'
-          check-latest: true
-          
-      - name: Environment Diagnostics
-        run: |
-          node -v
-          npm -v
+          node-version: '22'
           
       - name: Clean Install
         run: |
@@ -117,10 +99,15 @@ jobs:
       - name: Build Web Assets
         run: npm run build
         
-      - name: Capacitor Sync iOS
-        run: npm run ios-sync
-        
-      - name: Build iOS Project
+      - name: Capacitor Sync & Pods
         run: |
-          cd ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos build CODE_SIGNING_ALLOWED=NO
+          npx cap sync ios
+          cd ios/App && pod install
+        
+      - name: Build iOS Project (Check Only)
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+                     -scheme App \
+                     -configuration Debug \
+                     -sdk iphoneos \
+                     build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
