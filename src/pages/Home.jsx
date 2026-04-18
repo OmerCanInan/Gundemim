@@ -265,7 +265,7 @@ export default function Home() {
             )}
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ padding: '0 2rem' }}>
+          <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 2.5rem' }}>
              <PlusCircle size={18} /> Ekle
           </button>
         </form>
