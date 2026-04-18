@@ -23,8 +23,7 @@
       "output": "pack"
     },
     "electronDownload": {
-      "mirror": "https://npmmirror.com/mirrors/electron/",
-      "customDir": "https://npmmirror.com/mirrors/electron-builder-binaries/"
+      "mirror": "https://npmmirror.com/mirrors/electron/"
     },
     "win": {
       "target": ["nsis", "portable"],
