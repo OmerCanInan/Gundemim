@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import NewsFeed from './pages/NewsFeed';
 import Discover from './pages/Discover';
 import HowToUseDrawer from './components/HowToUseDrawer';
+import Legal from './pages/Legal';
 
 import { useEffect, useState } from 'react';
 import { getAppSettings } from './services/dbService';
@@ -143,6 +144,7 @@ function AppContent({ isSidebarOpen, setIsSidebarOpen, isHowToUseOpen, setIsHowT
             <Route path="/" element={<Home />} />
             <Route path="/news" element={<NewsFeed />} />
             <Route path="/discover" element={<Discover />} />
+            <Route path="/legal" element={<Legal />} />
           </Routes>
         </main>
       </div>

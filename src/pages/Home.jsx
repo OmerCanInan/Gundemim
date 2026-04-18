@@ -389,7 +389,27 @@ export default function Home() {
                </div>
 
             </div>
-         </section>
+          </section>
+
+          {/* SESSİZ HUKUKİ LİNK - Ayarlar sekmesinin en altında gömülü */}
+          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+            <Link 
+              to="/legal" 
+              style={{ 
+                fontSize: '0.75rem', 
+                color: 'var(--text-light)', 
+                opacity: 0.6, 
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+              onMouseOut={(e) => e.currentTarget.style.opacity = 0.6}
+            >
+              <ShieldAlert size={12} /> Hukuki Bilgiler, Kullanım Şartları ve Gizlilik Politikası
+            </Link>
+          </div>
 
       </div>
       )}

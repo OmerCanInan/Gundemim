@@ -336,8 +336,20 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 8000) => {
       cleanUrl = cleanUrl.split('?')[0]; 
     }
 
-    // Hem dışarıdan gelen signal hem de iç timeout signal'ini birleştir (AbortSignal.any modern tarayıcılar içindir)
-    // Fallback olarak sadece kendi timeout controller'ımızı kullanıyoruz (veya signal varsa onu dinliyoruz)
+    // --- PC (Electron) GÜVENLİ ÇEKİM ---
+    if (window.electronAPI && typeof window.electronAPI.fetchRss === 'function') {
+      try {
+        xmlText = await window.electronAPI.fetchRss(cleanUrl);
+        clearTimeout(id);
+        return xmlText;
+      } catch (err) {
+        clearTimeout(id);
+        throw err;
+      }
+    }
+
+    // --- NORMAL FETCH (Mobil / Web) ---
+    // Hem dışarıdan gelen signal hem de iç timeout signal'ini birleştir
     const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 
     const response = await fetch(cleanUrl, { 
