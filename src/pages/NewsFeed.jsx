@@ -228,18 +228,15 @@ export default function NewsFeed() {
               .then(items => {
                 if (!isCancelled && requestId === latestRequestIdRef.current) {
                    setRefreshStat(prev => ({ ...prev, done: prev.done + 1 }));
-                   if (items && items.length > 0) {
-                     saveNewsItems(items);
-                     setNews(prevNews => {
-                        const combined = [...prevNews];
-                        const existingKeys = new Set(combined.map(n => n.title + n.link));
-                        items.forEach(it => {
-                           if (!existingKeys.has(it.title + it.link)) combined.push(it);
-                        });
-                        return sortNews(filterByContext(combined));
-                     });
-                     setLoading(false);
-                   }
+                    if (items && items.length > 0) {
+                      saveNewsItems(items);
+                      // Taze veriyi merkezi cache'den besle (Senkronizasyon Fix)
+                      // NOT: Yükleme sırasında her seferinde setNews yapmak yerine, 
+                      // performans için throttle edilebilir ama şimdilik senkronizasyon için kalsın.
+                      const allNews = getNewsCache();
+                      setNews(sortNews(filterByContext(allNews)));
+                      setLoading(false);
+                    }
                 }
                 return { status: 'fulfilled', url: linkObj.url };
               })
@@ -261,19 +258,29 @@ export default function NewsFeed() {
           return failed;
         };
 
-        // PASS 1: Hızlı Şerit (5 saniye limit)
-        const failedInPass1 = await runTasks(linksToFetch, 20, 5000);
+        // --- ÜÇ AŞAMALI AKILLI GÜNCELLEME (Triple-Pass Strategy) ---
+        // PASS 0: Kritik Öncelik (8 Saniye Limit - İlk 5-8 Kaynak)
+        const oneHourAgo = new Date().getTime() - (60 * 60 * 1000);
+        const activeSourceUrls = new Set(initialData.filter(i => i.date && i.date.getTime() > oneHourAgo).map(i => i.sourceUrl));
+        const priorityLinks = linksToFetch.filter(l => activeSourceUrls.has(l.url)).slice(0, 8);
+        const others = linksToFetch.filter(l => !activeSourceUrls.has(l.url) || priorityLinks.indexOf(l) === -1);
 
-        // Birinci aşama bitti, spinner'ı kapatıp "Hızlı Entegrasyon"u kutlayalım
+        if (priorityLinks.length > 0) {
+           await runTasks(priorityLinks, 4, 8000); // En aktifleri anında bitir!
+        }
+
+        // PASS 1: Standart Şerid (20 saniye limit)
+        const failedInPass1 = await runTasks(others, 5, 20000);
+
+        // İlk iki aşama bitti, kullanıcıyı bekletmeyi bırakalım
         if (!isCancelled && requestId === latestRequestIdRef.current) {
-          setIsRefreshing(false);
+          setIsRefreshing(others.length > 10); // Sadece çok fazla kaldıysa spinner kalsın
           setLoading(false);
         }
 
-        // PASS 2: Güvenli Şerit (Arka Plan - 15 saniye limit)
+        // PASS 2: Derin Tarama (Arka Plan - 60 saniye limit)
         if (failedInPass1.length > 0 && !isCancelled && requestId === latestRequestIdRef.current) {
-           // Kalanları daha uzun süreyle sessizce dene
-           await runTasks(failedInPass1, 5, 15000);
+           await runTasks(failedInPass1, 2, 60000);
         }
 
       } catch (err) {
@@ -539,9 +546,34 @@ export default function NewsFeed() {
           <Link to="/" className="btn-back">
             <ArrowLeft size={18} /> Geri Dön
           </Link>
-          <h2 className="page-title" style={{ marginTop: '0.5rem' }}>
-            {pageTitle} {news.length > 0 && `(${news.length})`}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+            <h2 className="page-title" style={{ margin: 0 }}>
+              {pageTitle} {news.length > 0 && `(${news.length})`}
+            </h2>
+            <button 
+              onClick={() => { window.location.reload(); }} 
+              title="Zorla Yenile"
+              className="refresh-btn-minimal"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-light)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '4px',
+                opacity: 0.6,
+                transition: 'all 0.2s'
+              }}
+            >
+              <RefreshCw size={18} className={isRefreshing ? 'spin' : ''} />
+            </button>
+            {isRefreshing && refreshStat.total > 0 && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', opacity: 0.8, fontWeight: '600' }}>
+                {refreshStat.done}/{refreshStat.total} Güncelleniyor...
+              </span>
+            )}
+          </div>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>

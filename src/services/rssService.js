@@ -339,17 +339,13 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
     // --- PC (Electron) GÜVENLİ ÇEKİM ---
     if (window.electronAPI && typeof window.electronAPI.fetchRss === 'function') {
       try {
-        xmlText = await window.electronAPI.fetchRss(cleanUrl);
-        clearTimeout(id);
-        return xmlText;
+        xmlText = await window.electronAPI.fetchRss(cleanUrl, timeoutMs);
+        if (!xmlText) throw new Error('Fetch aborted or empty in electron');
+        // Devam ediyoruz, aşağıda parse edilecek.
       } catch (err) {
-        clearTimeout(id);
         throw err;
       }
-    }
-
-    // --- MOBİL (Android/iOS) GÜVENLİ ÇEKİM (CapacitorHttp) ---
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
+    } else if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
       try {
         const { CapacitorHttp } = window.Capacitor.Plugins;
         const capResponse = await CapacitorHttp.get({
@@ -372,31 +368,34 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
       }
     }
 
-    // --- NORMAL FETCH (Mobil Fallback / Web) ---
-    const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-    const response = await fetch(cleanUrl, { 
-      signal: activeSignal,
-      cache: 'default',
-      headers: {
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    });
-    clearTimeout(id);
-
-    if (!response.ok) {
-        let errorMsg = `Sunucu Hatası (${response.status})`;
-        if (response.status === 403 || response.status === 401) {
-            errorMsg = "Bu siteye erişim engellendi (403/401).";
-        } else if (response.status === 404) {
-            errorMsg = "RSS linki bulunamadı (404).";
+    if (!xmlText) {
+      // --- NORMAL FETCH (Mobil Fallback / Web) ---
+      const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+      const response = await fetch(cleanUrl, { 
+        signal: activeSignal,
+        cache: 'default',
+        headers: {
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
-        throw new Error(errorMsg);
+      });
+      
+      if (!response.ok) {
+          let errorMsg = `Sunucu Hatası (${response.status})`;
+          if (response.status === 403 || response.status === 401) {
+              errorMsg = "Bu siteye erişim engellendi (403/401).";
+          } else if (response.status === 404) {
+              errorMsg = "RSS linki bulunamadı (404).";
+          }
+          throw new Error(errorMsg);
+      }
+      
+      xmlText = await response.text();
     }
     
-    xmlText = await response.text();
+    clearTimeout(id);
     
     // BOŞ VEYA HATALI İÇERİK KONTROLÜ
     if (!xmlText || xmlText.trim().length === 0 || !xmlText.includes('<')) {

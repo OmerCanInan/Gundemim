@@ -98,18 +98,23 @@ ipcMain.handle('get-api-key', async () => {
 });
 
 // IPC: RSS Fetching (Audit: Move RSS fetching to Main)
-ipcMain.handle('fetch-rss', async (event, url) => {
+ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 10000) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), GLOBAL_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  const cleanUrl = url.trim();
+  console.log(`[IPC:fetch-rss] Requesting: ${cleanUrl} (Timeout: ${timeoutMs}ms)`);
 
   try {
-    const response = await net.fetch(url, {
+    const response = await fetch(cleanUrl, {
       signal: controller.signal,
       headers: {
-        'User-Agent': app.userAgentFallback,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Cache-Control': 'no-cache'
       }
     });
+    
+    console.log(`[IPC:fetch-rss] Response: ${response.status} for ${cleanUrl}`);
     
     clearTimeout(timeoutId);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);

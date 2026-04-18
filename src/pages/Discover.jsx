@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 // Sabit keşfet listemiz - Buraya istenildiği kadar site eklenebilir.
 const DISCOVER_FEEDS = [
   { folder: "Haber & Gündem", feeds: [
-    { name: "TRT Haber", url: "https://www.trthaber.com/sondakika_ilan.rss" },
+    { name: "TRT Haber", url: "https://www.trthaber.com/sondakika_articles.rss" },
     { name: "NTV Son Dakika", url: "https://www.ntv.com.tr/son-dakika.rss" },
     { name: "Sözcü", url: "https://www.sozcu.com.tr/rss" },
     { name: "Cumhuriyet", url: "https://www.cumhuriyet.com.tr/rss" },
@@ -19,7 +19,7 @@ const DISCOVER_FEEDS = [
     { name: "BBC Türkçe", url: "https://feeds.bbci.co.uk/turkce/rss.xml" },
     { name: "Medyascope", url: "https://medyascope.tv/feed/" },
     { name: "Euronews TR", url: "https://tr.euronews.com/rss?level=vertical&name=turkey" },
-    { name: "Milliyet", url: "https://www.milliyet.com.tr/rss/rsshesapla.xml?anakategoriid=1" },
+    { name: "Milliyet", url: "https://www.milliyet.com.tr/rss/rssNew/gundemRss.xml" },
     { name: "Karar Gazetesi", url: "https://www.karar.com/rss.xml" },
     { name: "Anadolu Ajansı", url: "https://www.aa.com.tr/tr/rss/default?cat=guncel" }
   ]},
@@ -68,9 +68,9 @@ const DISCOVER_FEEDS = [
   { folder: "Spor", feeds: [
     { name: "Beinsports", url: "https://www.beinsports.com.tr/rss/haber" },
     { name: "NTV Spor", url: "https://www.ntvspor.net/rss" },
-    { name: "Fanatik", url: "https://www.fanatik.com.tr/rss" },
-    { name: "Fotomaç", url: "https://www.fotomac.com.tr/rss/tum" },
-    { name: "Sporx", url: "https://www.sporx.com/rss/" },
+    { name: "Fanatik", url: "https://www.fanatik.com.tr/rss/anasayfa.xml" },
+    { name: "Fotomaç", url: "https://www.fotomac.com.tr/rss/anasayfa.xml" },
+    { name: "Sporx", url: "https://www.sporx.com/rss/haberler.xml" },
     { name: "Ajansspor", url: "https://ajansspor.com/rss" },
     { name: "Mackolik", url: "https://www.mackolik.com/rss" }
   ]},
@@ -108,7 +108,7 @@ const READY_PACKAGES = [
     color: "#e11d48",
     folder: "Haber & Gündem",
     feeds: [
-      { name: "TRT Haber", url: "https://www.trthaber.com/sondakika_ilan.rss" },
+      { name: "TRT Haber", url: "https://www.trthaber.com/sondakika_articles.rss" },
       { name: "NTV Son Dakika", url: "https://www.ntv.com.tr/son-dakika.rss" },
       { name: "Sözcü", url: "https://www.sozcu.com.tr/rss" },
       { name: "Cumhuriyet", url: "https://www.cumhuriyet.com.tr/rss" },

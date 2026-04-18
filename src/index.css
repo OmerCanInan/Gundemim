@@ -601,6 +601,21 @@ h4 {
     height: 20px !important;
   }
   .navbar-logo h1 {
+    font-size: 1rem !important; /* Slightly smaller for narrow screens */
+  }
+
+  /* AI Modal Mobile Optimization */
+  .news-feed-container [style*="max-width: 700px"] {
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    border-radius: 12px !important;
+  }
+
+  .news-feed-container [style*="padding: 1.5rem"] {
+    padding: 1rem !important; /* Less padding on small screens */
+  }
+
+  .news-feed-container [style*="font-size: 1.2rem"] {
     font-size: 1.1rem !important;
   }
 
@@ -670,7 +685,33 @@ h4 {
 
   .news-grid {
     grid-template-columns: 1fr !important;
-    gap: 1rem !important;
+    gap: 0.75rem !important;
+  }
+
+  .news-card {
+    border-radius: 8px !important;
+  }
+
+  .card-image-container {
+    height: 160px !important; /* Tighter for mobile */
+  }
+
+  .card-content {
+    padding: 1rem !important;
+  }
+  
+  .card-title {
+    font-size: 1.05rem !important;
+  }
+
+  .card-description {
+    font-size: 0.85rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .read-more-button {
+    padding: 0.75rem !important; /* Better touch target */
+    font-size: 0.85rem !important;
   }
 
   .mobile-only {

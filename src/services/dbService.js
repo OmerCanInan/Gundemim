@@ -24,7 +24,43 @@ export const generateUUID = () => {
 export const getRssLinks = () => {
   try {
     const data = localStorage.getItem(DB_KEY);
-    return data ? JSON.parse(data) : [];
+    let links = data ? JSON.parse(data) : [];
+    
+    // --- OTOMATİK ONARIM VE TEMİZLİK (Self-Healing Fix) ---
+    // Ölmek üzere olan veya değişen RSS linklerini güncelliyoruz
+    let hasMigration = false;
+    const migrations = {
+      'trthaber.com/sondakika_ilan.rss': 'trthaber.com/sondakika_articles.rss',
+      'trthaber.com/manset_ilan.rss': 'trthaber.com/manset_articles.rss',
+      'milliyet.com.tr/rss/rsshesapla.xml?anakategoriid=1': 'milliyet.com.tr/rss/rssNew/gundemRss.xml',
+      'fotomac.com.tr/rss/tum': 'fotomac.com.tr/rss/anasayfa.xml',
+      'fanatik.com.tr/rss': 'fanatik.com.tr/rss/anasayfa.xml',
+      'sporx.com/rss/': 'sporx.com/rss/haberler.xml'
+    };
+
+    links = links.map(link => {
+      // Önce varsa bozulan linkleri (tekrar eden kelimeleri) temizle
+      if (link.url.includes('haberler.xmlhaberler.xml') || link.url.includes('anasayfa.xml/anasayfa.xml')) {
+         link.url = link.url.replace(/(haberler\.xml)+/g, 'haberler.xml');
+         link.url = link.url.replace(/(\/anasayfa\.xml)+/g, '/anasayfa.xml');
+         hasMigration = true;
+      }
+
+      // Güvenli değişim: Sadece eski linkle BİTİYORSA değiştir (Recursion Fix)
+      for (const [oldUrl, newUrl] of Object.entries(migrations)) {
+        if (link.url.endsWith(oldUrl)) {
+          link.url = link.url.replace(oldUrl, newUrl);
+          hasMigration = true;
+        }
+      }
+      return link;
+    });
+
+    if (hasMigration) {
+      localStorage.setItem(DB_KEY, JSON.stringify(links));
+    }
+
+    return links;
   } catch (error) {
     console.error('Veritabanından okunurken hata oluştu:', error);
     return [];

@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Renderer (React) tarafına sunulan güvenli köprü
 contextBridge.exposeInMainWorld('electronAPI', {
   // RSS Verilerini çekmek için (CORS-Safe)
-  fetchRss: (url) => ipcRenderer.invoke('fetch-rss', url),
+  fetchRss: (url, timeoutMs) => ipcRenderer.invoke('fetch-rss', url, timeoutMs),
   
   // Şifreli Veri Saklama (Audit: Groq API Key Güvenliği için)
   saveApiKey: (key) => ipcRenderer.invoke('save-api-key', key),
