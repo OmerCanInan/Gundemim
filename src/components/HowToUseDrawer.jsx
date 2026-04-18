@@ -1,6 +1,8 @@
-import { X, Rss, Key, HelpCircle, Info, ExternalLink, MousePointerClick, CheckCircle } from 'lucide-react';
+import { X, Rss, Key, HelpCircle, Info, ExternalLink, MousePointerClick, CheckCircle, Compass } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function HowToUseDrawer({ isOpen, onClose }) {
+  const navigate = useNavigate();
   if (!isOpen) return null;
 
   return (
@@ -36,7 +38,64 @@ export default function HowToUseDrawer({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Section 1: RSS Bulma */}
+        {/* [NEW] Quick Start / Discover CTA - REVISED V8 */}
+        <div 
+          onClick={() => {
+            onClose();
+            navigate('/discover');
+          }}
+          style={{
+            background: 'var(--bg-secondary)',
+            border: '2px solid var(--success-color)',
+            borderRadius: '16px',
+            padding: '1.25rem',
+            marginBottom: '2.5rem',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            transition: 'all 0.2s ease',
+            position: 'relative',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.2)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.3)'; }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Compass size={18} color="var(--success-color)" />
+              <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--success-color)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>HIZLI BAŞLANGIÇ</span>
+            </div>
+            <div style={{ background: 'var(--success-color)', color: '#fff', padding: '2px 8px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 'bold' }}>
+              ÖNERİLEN
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--text-color)', fontWeight: '700' }}>Hazır Paketleri Keşfet</h3>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.4' }}>
+              Hiçbir ayarla uğraşmadan 50+ popüler haberi tek tıkla listenize ekleyin.
+            </p>
+          </div>
+
+          <div style={{ 
+            marginTop: '4px', 
+            width: '100%', 
+            padding: '0.75rem', 
+            borderRadius: '10px', 
+            background: 'var(--success-color)', 
+            color: '#fff', 
+            textAlign: 'center', 
+            fontWeight: '700', 
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            Şimdi Keşfet'e Git <Compass size={16} />
+          </div>
+        </div>
         <section style={{ marginBottom: '2.5rem' }}>
           <h3 style={{ fontSize: '1rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
             <Rss size={18} color="#f97316" /> RSS Linklerini Bulma

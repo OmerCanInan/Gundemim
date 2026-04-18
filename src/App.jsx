@@ -1,4 +1,4 @@
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { TranslationProvider } from './context/TranslationContext';
 import { RadioProvider } from './context/RadioContext';
 import Navbar from './components/Navbar';
@@ -67,48 +67,86 @@ function App() {
     <TranslationProvider>
       <RadioProvider>
         <Router>
-          <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
-            
-            {/* Premium PC Bildirim Paneli */}
-            {pcNotification && (
-              <div className="pc-notification-container">
-                <div className={`pc-notification ${pcNotification.type || ''}`}>
-                  <div className="pc-notification-icon">
-                    <AlertTriangle size={20} />
-                  </div>
-                  <div className="pc-notification-content">
-                    <div className="pc-notification-title">{pcNotification.title}</div>
-                    <div className="pc-notification-message">
-                      {pcNotification.message}
-                      <div style={{ marginTop: '4px', fontSize: '10px', opacity: 0.8 }}>{pcNotification.detail}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-            <div className="app-body">
-              <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
-              
-              {/* Mobile Overlay */}
-              {isSidebarOpen && (
-                <div className="mobile-overlay" onClick={() => setIsSidebarOpen(false)}></div>
-              )}
-  
-              <main className="main-content">
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/news" element={<NewsFeed />} />
-                  <Route path="/discover" element={<Discover />} />
-                </Routes>
-              </main>
-            </div>
-            <HowToUseDrawer isOpen={isHowToUseOpen} onClose={() => setIsHowToUseOpen(false)} />
-          </div>
+          <AppContent 
+            isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
+            isHowToUseOpen={isHowToUseOpen} setIsHowToUseOpen={setIsHowToUseOpen}
+            pcNotification={pcNotification}
+          />
         </Router>
       </RadioProvider>
     </TranslationProvider>
+  );
+}
+
+// Alt bileşende Router context'ine (useLocation) erişebilmek için AppContent oluşturuldu
+function AppContent({ isSidebarOpen, setIsSidebarOpen, isHowToUseOpen, setIsHowToUseOpen, pcNotification }) {
+  const location = useLocation();
+
+  // --- SCROLL RESET (Tepeden Başlatma) ---
+  useEffect(() => {
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      mainContent.scrollTop = 0;
+    }
+  }, [location.pathname]);
+
+  // --- ONBOARDING (İlk Karşılama) ---
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('gundemim_first_start');
+    if (!hasSeenOnboarding) {
+      setIsHowToUseOpen(true);
+      localStorage.setItem('gundemim_first_start', 'done');
+    }
+  }, [setIsHowToUseOpen]);
+
+  // --- PC BAŞLANGIÇ YÖNLENDİRMESİ (Redirect to Discover) ---
+  useEffect(() => {
+    const isElectron = window.navigator.userAgent.toLowerCase().includes('electron');
+    if (isElectron && location.pathname === '/') {
+      navigate('/discover', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  return (
+    <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      
+      {/* Premium PC Bildirim Paneli */}
+      {pcNotification && (
+        <div className="pc-notification-container">
+          <div className={`pc-notification ${pcNotification.type || ''}`}>
+            <div className="pc-notification-icon">
+              <AlertTriangle size={20} />
+            </div>
+            <div className="pc-notification-content">
+              <div className="pc-notification-title">{pcNotification.title}</div>
+              <div className="pc-notification-message">
+                {pcNotification.message}
+                <div style={{ marginTop: '4px', fontSize: '10px', opacity: 0.8 }}>{pcNotification.detail}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <div className="app-body">
+        <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
+        
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div className="mobile-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+        )}
+
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/news" element={<NewsFeed />} />
+            <Route path="/discover" element={<Discover />} />
+          </Routes>
+        </main>
+      </div>
+      <HowToUseDrawer isOpen={isHowToUseOpen} onClose={() => setIsHowToUseOpen(false)} />
+    </div>
   );
 }
 

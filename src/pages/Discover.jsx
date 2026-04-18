@@ -353,9 +353,7 @@ export default function Discover() {
         <h3 style={{ fontSize: '1.2rem', color: 'var(--text-color)', marginBottom: '1.2rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Package size={20} /> Hazır Paketler
         </h3>
-        <div style={{ 
-          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' 
-        }}>
+        <div className="pkg-grid">
           {READY_PACKAGES.map((pkg, idx) => {
             const status = getPackageStatus(pkg);
             return (

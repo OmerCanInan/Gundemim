@@ -682,6 +682,19 @@ h4 {
     margin-bottom: 1.2rem !important;
     padding-bottom: 0.8rem !important;
   }
+
+  /* Keşfet Paket Kartları Mobilde Tek Sütun */
+  .pkg-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.8rem !important;
+  }
+}
+
+/* Keşfet Paket Grid (Desktop Varsayılan - 2 Sütun) */
+.pkg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
 /* DESKTOP SPECIFIC OVERRIDES (Safeguard) */
