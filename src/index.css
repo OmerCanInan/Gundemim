@@ -38,12 +38,12 @@
 
   --border-color: #334155;
 
-  --primary-color: #ffffff;
-  --primary-color-rgb: 255, 255, 255;
-  --accent-color: #000000;
+  --primary-color: #10b981;
+  --primary-color-rgb: 16, 185, 129;
+  --accent-color: #059669;
   --danger-color: #ef4444;
   --danger-color-rgb: 239, 68, 68;
-  --success-color: #10b981;
+  --success-color: #059669;
 
   /* Varsayılan Fontlar (Mix) */
   --font-serif: 'Merriweather', serif;

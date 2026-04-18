@@ -81,7 +81,7 @@ jobs:
         run: ./gradlew assembleDebug
         
       - name: Rename APK
-        run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Gundemim-v0.1.0-B${{ github.run_number }}.apk
+        run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Gundemim-v1.0.0-B${{ github.run_number }}.apk
         
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
@@ -151,16 +151,23 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0
-          name: "Gündemim v0.1.0"
+          tag_name: v1.0.0
+          name: "Gündemim v1.0.0 - Production Master"
           body: |
-            Gündemim RSS Okuyucu - İlk Profesyonel Yayın! 🚀
+            Gündemim RSS Okuyucu - Büyük Final Yayını! 🏆🧿
             
-            **Yenilikler:**
-            - "Gündemim" markası ve logosu tüm platformlara eklendi.
-            - Windows için Kurulum (Setup) ve Taşınabilir (Portable) sürümler.
-            - Android için APK dosyası (`Gundemim.apk`).
-            - iOS için altyapı hazırlıkları tamamlandı.
+            Bu sürüm, uygulamanın market (Play Store/Windows) yayınına hazır, güvenlik ve hukuk sertifikalı master versiyonudur.
+            
+            **Önemli Güncellemeler:**
+            - 🛡️ **Hukuki Zırh:** Play Store standartlarında "Kurşun Geçirmez" legal metinler ve gizlilik politikası.
+            - 🔐 **Siber Güvenlik:** `safeStorage` ile şifreli API anahtarları, `contextIsolation` ve tam izolasyonlu preload bridge.
+            - 🚀 **Turbo Performans:** V12 ağ optimizasyonu ve `CapacitorHttp` ile mobil CORS bypass desteği.
+            - 📦 **Hafıza Yönetimi:** LocalStorage dolmasına karşı "Akıllı Budama" (Quota Protection) teknolojisi.
+            - 💎 **Marka Kimliği:** Tüm platformlarda "Gündemim" logosu ve profesyonel paket adı (`com.omer.reader`).
+            
+            **Kurulum Dosyaları:**
+            - **Windows:** `.exe` dosyası (Portable & Setup).
+            - **Android:** `.apk` dosyası.
           files: |
             release-assets/*
           draft: false

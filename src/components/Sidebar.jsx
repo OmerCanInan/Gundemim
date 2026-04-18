@@ -74,14 +74,14 @@ export default function Sidebar({ isOpen, closeSidebar }) {
         {isPlaying && (
           <div className="sidebar-section radio-player-fade" style={{ 
             marginTop: '1rem', 
-            background: 'rgba(239, 68, 68, 0.05)', 
+            background: 'rgba(16, 185, 129, 0.05)', 
             borderRadius: '12px', 
             padding: '1rem',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            boxShadow: '0 0 15px rgba(239, 68, 68, 0.1)'
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)'
           }}>
             <div className="sidebar-title" style={{ 
-              color: '#ff8a8a', 
+              color: '#34d399', 
               fontSize: '0.75rem', 
               marginBottom: '0.5rem',
               display: 'flex',
