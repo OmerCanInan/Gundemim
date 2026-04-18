@@ -272,15 +272,23 @@ h4 {
 }
 
 .btn-primary {
-  background-color: var(--primary-color);
-  color: var(--bg-color);
-  border: 1px solid var(--primary-color);
-  font-weight: 600;
+  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 4px 15px rgba(var(--primary-color-rgb), 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
 .btn-primary:hover {
-  background-color: var(--text-light);
-  border-color: var(--text-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(var(--primary-color-rgb), 0.4);
+  filter: brightness(1.1);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
 }
 
 .btn-secondary {

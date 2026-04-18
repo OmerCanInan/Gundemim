@@ -358,11 +358,11 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
           connectTimeout: 10000,
           readTimeout: 10000
         });
-        clearTimeout(id);
         if (capResponse.status >= 200 && capResponse.status < 300) {
-          return capResponse.data;
+          xmlText = capResponse.data;
+        } else {
+          throw new Error(`CapacitorHttp error: ${capResponse.status}`);
         }
-        throw new Error(`CapacitorHttp error: ${capResponse.status}`);
       } catch (err) {
         console.warn("CapacitorHttp failed, falling back to fetch:", err);
       }
