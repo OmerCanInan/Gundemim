@@ -1,4 +1,4 @@
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { TranslationProvider } from './context/TranslationContext';
 import { RadioProvider } from './context/RadioContext';
 import Navbar from './components/Navbar';
@@ -81,6 +81,7 @@ function App() {
 // Alt bileşende Router context'ine (useLocation) erişebilmek için AppContent oluşturuldu
 function AppContent({ isSidebarOpen, setIsSidebarOpen, isHowToUseOpen, setIsHowToUseOpen, pcNotification }) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   // --- SCROLL RESET (Tepeden Başlatma) ---
   useEffect(() => {
