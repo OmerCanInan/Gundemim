@@ -4,6 +4,7 @@ name: "Gündemim Multi-Platform Build"
 on:
   push:
     branches: [ "main", "master" ]
+    tags: [ "v*" ]
   workflow_dispatch:
 
 permissions:
