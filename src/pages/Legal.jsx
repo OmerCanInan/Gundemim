@@ -24,13 +24,12 @@ export default function Legal() {
           Bu metin, yasal dayanıklılık ve "Google Play Store Haber Politikası" standartlarına tam uyum için hazırlanmıştır.
         </p>
 
-        {/* 1. İçerik Kullanımı ve Telif Hakları */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.2rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
             <Scale size={20} color="var(--primary-color)" /> 1. İçerik Kullanımı ve Telif Hakları
           </h2>
           <div style={{ color: 'var(--text-light)', fontSize: '0.95rem', lineHeight: '1.8' }}>
-            <p>Gündemim bir içerik üreticisi değildir; üçüncü taraf haber kaynaklarına ait içerikleri kalıcı olarak depolamaz veya yeniden dağıtmaz.</p>
+            <p>Gündemim bir içerik üreticisi değildir; üçüncü taraf haber kaynaklarına ait içerikler yalnızca kullanıcı deneyimi için 7 gün boyunca yerel cihazda geçici olarak tutulur, üçüncü taraflara iletilmez veya kalıcı olarak arşivlenmez.</p>
             <ul>
               <li><strong>Anlık Gösterim:</strong> İçerikler, ilgili kaynağın sağladığı RSS verilerinden anlık olarak alınır ve yalnızca görüntüleme amacıyla sunulur.</li>
               <li><strong>Önbellekleme:</strong> Uygulama, içerikleri kalıcı veya yeniden dağıtım amaçlı olarak önbelleğe (cache) almaz.</li>

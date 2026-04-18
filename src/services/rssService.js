@@ -348,16 +348,40 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
       }
     }
 
-    // --- NORMAL FETCH (Mobil / Web) ---
-    // Hem dışarıdan gelen signal hem de iç timeout signal'ini birleştir
-    const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+    // --- MOBİL (Android/iOS) GÜVENLİ ÇEKİM (CapacitorHttp) ---
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
+      try {
+        const { CapacitorHttp } = window.Capacitor.Plugins;
+        const capResponse = await CapacitorHttp.get({
+          url: cleanUrl,
+          headers: {
+            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          },
+          connectTimeout: 10000,
+          readTimeout: 10000
+        });
+        clearTimeout(id);
+        if (capResponse.status >= 200 && capResponse.status < 300) {
+          return capResponse.data;
+        }
+        throw new Error(`CapacitorHttp error: ${capResponse.status}`);
+      } catch (err) {
+        console.warn("CapacitorHttp failed, falling back to fetch:", err);
+      }
+    }
 
+    // --- NORMAL FETCH (Mobil Fallback / Web) ---
+    const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
     const response = await fetch(cleanUrl, { 
       signal: activeSignal,
       cache: 'default',
       headers: {
         'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       }
     });
     clearTimeout(id);

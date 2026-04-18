@@ -1,12 +1,12 @@
 // src/services/aiService.js
 import { getGroqApiKey } from './dbService';
 
+// Modül seviyesinde önbellek (V12.3)
+let cachedModelId = null;
+
 /**
  * Verilen RSS haber nesnelerini (Title + Description) alıp Groq API'ye
  * gönderir ve genel bir özet metni döndürür.
- * 
- * YASAL UYARI: Bu işlem web scraping (veri kazıma) içermez. Sadece RSS standartlarıyla 
- * ücretsiz ve yayıncı onaylı sunulan "title" ve "description" metinlerini okur.
  */
 export const summarizeNewsWithGemini = async (newsItems, category = 'Genel Haberler') => {
   const apiKey = await getGroqApiKey();
@@ -49,30 +49,34 @@ HAYATİ KURALLAR:
   const url = `https://api.groq.com/openai/v1/chat/completions`;
   const cleanKey = apiKey.trim();
 
-  // 1. DİNAMİK MODEL TESPİTİ
-  let targetModel = 'llama3-70b-8192'; 
-  try {
-     const listUrl = `https://api.groq.com/openai/v1/models`;
-     const listRes = await fetch(listUrl, {
-         headers: { 'Authorization': `Bearer ${cleanKey}` }
-     });
-     if (listRes.ok) {
-        const listData = await listRes.json();
-        const models = listData.data || [];
-        
-        const validModels = models.filter(m => m.id.toLowerCase().includes('llama') && !m.id.toLowerCase().includes('vision') && !m.id.toLowerCase().includes('tool'));
-        
-        if (validModels.length > 0) {
-            const bestModel = validModels.find(m => m.id.includes('70b-versatile'))
-                           || validModels.find(m => m.id.includes('70b'))
-                           || validModels.find(m => m.id.includes('8b-instant'))
-                           || validModels[0];
-            
-            targetModel = bestModel.id;
-        }
-     }
-  } catch (err) {
-     console.warn("Groq model listesi çekilemedi, varsayılan deneniyor.", err);
+  // 1. DİNAMİK MODEL TESPİTİ (Caching - V12.3)
+  let targetModel = cachedModelId || 'llama3-70b-8192'; 
+  
+  if (!cachedModelId) {
+    try {
+      const listUrl = `https://api.groq.com/openai/v1/models`;
+      const listRes = await fetch(listUrl, {
+          headers: { 'Authorization': `Bearer ${cleanKey}` }
+      });
+      if (listRes.ok) {
+         const listData = await listRes.json();
+         const models = listData.data || [];
+         
+         const validModels = models.filter(m => m.id.toLowerCase().includes('llama') && !m.id.toLowerCase().includes('vision') && !m.id.toLowerCase().includes('tool'));
+         
+         if (validModels.length > 0) {
+             const bestModel = validModels.find(m => m.id.includes('70b-versatile'))
+                            || validModels.find(m => m.id.includes('70b'))
+                            || validModels.find(m => m.id.includes('8b-instant'))
+                            || validModels[0];
+             
+             targetModel = bestModel.id;
+             cachedModelId = targetModel; // Önbelleğe al (Audit fix)
+         }
+      }
+    } catch (err) {
+      console.warn("Groq model listesi çekilemedi, varsayılan deneniyor.", err);
+    }
   }
 
   try {

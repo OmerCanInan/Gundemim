@@ -128,10 +128,28 @@ export const saveNewsItems = (newItems) => {
   // 4. Yeni taze haberleri en üste (başa) ekle
   cached = [...itemsToAdd, ...cached];
 
-  // 5. Kaydet (Tarihler string'e dönüşecek)
-  localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
+  // 5. Kaydet (Audit: LocalStorage Limit Koruması - 5MB - V12.2)
+  try {
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
+  } catch (e) {
+    // Hafıza dolunca (5MB sınırı) en eski haberleri buda (Pruning)
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      console.warn("LocalStorage Dolu! Akıllı temizlik (Pruning) yapılıyor...");
+      // Listenin en başındakiler (yeni) kalsın, sonundakileri (%30) at.
+      const pruned = cached.slice(0, Math.floor(cached.length * 0.7));
+      try {
+        localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(pruned));
+        cached = pruned;
+      } catch (innerErr) {
+        // Hala doluvsa daha agresif temizle (Sadece 200 haber kalsın)
+        const ultraPruned = cached.slice(0, 200);
+        localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(ultraPruned));
+        cached = ultraPruned;
+      }
+    }
+  }
   
-  return cached; // Tekrar UI'a geri ver
+  return cached; // Tekrar UI'a güncel (veya budanmış) halini ver
 };
 
 // ==========================================
