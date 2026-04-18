@@ -1,9 +1,9 @@
 // src/pages/Home.jsx
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { getRssLinks, addRssLink, deleteRssLink, getGroqApiKey, saveGroqApiKey, getAppSettings, saveAppSettings } from '../services/dbService';
+import { getRssLinks, addRssLink, deleteRssLink, updateFolderName, getGroqApiKey, saveGroqApiKey, getAppSettings, saveAppSettings } from '../services/dbService';
 import { importOPML, exportOPML } from '../services/opmlService';
-import { Search, Globe, Trash2, PlusCircle, Folder, Download, Upload, Compass, Rss, ShieldAlert, Target, Sparkles, Key, ExternalLink, Settings, Type, LayoutGrid, LayoutList, Sun, Moon, CheckCircle, AlertCircle, Volume2, Play, HelpCircle } from 'lucide-react';
+import { Search, Globe, Trash2, PlusCircle, Folder, Download, Upload, Compass, Rss, ShieldAlert, Target, Sparkles, Key, ExternalLink, Settings, Type, LayoutGrid, LayoutList, Sun, Moon, CheckCircle, AlertCircle, Volume2, Play, HelpCircle, Edit2, Check, X } from 'lucide-react';
 
 // Önerilen kaynaklar listesi ayrı bir "Discover" (Keşfet) sayfasına taşındı.
 
@@ -20,6 +20,14 @@ export default function Home() {
   }, []);
   const [appSettings, setAppSettings] = useState(() => getAppSettings());
   const [searchParams] = useSearchParams();
+
+  // Custom Suggestions State
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredFolders, setFilteredFolders] = useState([]);
+  const [manageSearch, setManageSearch] = useState('');
+  const [editingFolder, setEditingFolder] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const suggestionRef = useRef(null);
   
   // URL'den tab parametresini oku
   useEffect(() => {
@@ -41,6 +49,20 @@ export default function Home() {
   // Özel onay modalı
   const [confirmModal, setConfirmModal] = useState(null);
 
+  // Helper: URL'den site ismi türet (V13)
+  const getDisplayName = (targetUrl) => {
+    try {
+      const urlObj = new URL(targetUrl);
+      let host = urlObj.hostname.replace('www.', '');
+      // .com, .net vb. temizle
+      host = host.split('.')[0];
+      // İlk harfi büyüt
+      return host.charAt(0).toUpperCase() + host.slice(1);
+    } catch (e) {
+      return targetUrl;
+    }
+  };
+
   const handleSettingChange = (key, value) => {
      const newSet = { ...appSettings, [key]: value };
      setAppSettings(newSet);
@@ -50,6 +72,27 @@ export default function Home() {
 
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+
+  // Suggestion Filter Logic
+  useEffect(() => {
+    const existingFolders = Object.keys(groupedLinks).filter(f => f !== 'Genel');
+    if (!folder.trim()) {
+      setFilteredFolders(existingFolders);
+    } else {
+      setFilteredFolders(existingFolders.filter(f => f.toLowerCase().includes(folder.toLowerCase())));
+    }
+  }, [folder, links]);
+
+  // Outside click for suggestions
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   // Linkleri klasörlere göre grupla
   const groupedLinks = links.reduce((acc, link) => {
@@ -67,6 +110,17 @@ export default function Home() {
     showToast('Kaynak başarıyla eklendi!');
     setUrl('');
     // Art arda aynı klasöre ekleme yapabilmek için folder state'ini temizlemiyoruz
+  };
+
+  const handleRenameFolder = (oldName) => {
+    if (!editValue.trim() || editValue.trim() === oldName) {
+      setEditingFolder(null);
+      return;
+    }
+    updateFolderName(oldName, editValue.trim());
+    setLinks(getRssLinks());
+    setEditingFolder(null);
+    showToast(`Klasör "${editValue.trim()}" olarak değiştirildi.`);
   };
 
 
@@ -141,27 +195,79 @@ export default function Home() {
            <PlusCircle size={18} /> Yeni Kaynak Ekle
         </h3>
         <form onSubmit={handleAddNewLink} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 300px', display: 'flex', alignItems: 'center', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.8rem' }}>
-            <Globe size={18} color="var(--text-light)" />
+          <div style={{ 
+            flex: '2 1 300px', display: 'flex', alignItems: 'center', background: 'var(--bg-color)', 
+            border: '1px solid var(--border-color)', borderRadius: '12px', padding: '0 0.8rem',
+            transition: 'all 0.3s ease-in-out',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+           }} className="input-group">
+            <Globe size={18} color="var(--primary-color)" />
             <input required
               type="url" 
               placeholder="RSS Linki (Örn: https://...)"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              style={{ width: '100%', padding: '0.8rem', border: 'none', outline: 'none', background: 'var(--bg-color)', color: 'var(--text-color)', borderRadius: '8px' }}
+              style={{ width: '100%', padding: '0.8rem', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-color)', fontSize: '0.95rem' }}
             />
           </div>
-          <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.8rem' }}>
-            <Folder size={18} color="var(--text-light)" />
-            <input 
-              type="text" 
-              placeholder="Klasör / Kategori"
-              value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              style={{ width: '100%', padding: '0.8rem', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-color)' }}
-            />
+          
+          <div style={{ 
+            flex: '1 1 200px', position: 'relative'
+          }} ref={suggestionRef}>
+            <div style={{ 
+              display: 'flex', alignItems: 'center', background: 'var(--bg-color)', 
+              border: showSuggestions ? '1px solid var(--primary-color)' : '1px solid var(--border-color)', 
+              borderRadius: '12px', padding: '0 0.8rem',
+              transition: 'all 0.3s ease',
+              boxShadow: showSuggestions ? '0 0 15px rgba(16, 185, 129, 0.2)' : 'none'
+            }}>
+              <Folder size={18} color={showSuggestions ? "var(--primary-color)" : "var(--text-light)"} />
+              <input 
+                type="text" 
+                placeholder="Klasör / Kategori"
+                value={folder}
+                onFocus={() => setShowSuggestions(true)}
+                onChange={(e) => { setFolder(e.target.value); setShowSuggestions(true); }}
+                style={{ width: '100%', padding: '0.8rem', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-color)', fontSize: '0.95rem' }}
+              />
+            </div>
+            
+            {showSuggestions && filteredFolders.length > 0 && (
+              <div className="fade-in" style={{
+                position: 'absolute', top: '110%', left: 0, right: 0, 
+                background: 'rgba(30, 41, 59, 0.85)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                zIndex: 1000,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                padding: '0.5rem'
+              }}>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-light)', padding: '0.3rem 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mevcut Klasörler</p>
+                {filteredFolders.map(f => (
+                  <div 
+                    key={f} 
+                    onClick={() => { setFolder(f); setShowSuggestions(false); }}
+                    style={{
+                      padding: '0.6rem 0.8rem', cursor: 'pointer', borderRadius: '6px',
+                      fontSize: '0.85rem', color: 'var(--text-color)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {f}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <button type="submit" className="btn btn-secondary" style={{ flex: '0 0 auto' }}>Ekle</button>
+
+          <button type="submit" className="btn btn-primary" style={{ padding: '0 2rem' }}>
+             <PlusCircle size={18} /> Ekle
+          </button>
         </form>
 
         <hr style={{ border: 'none', borderTop: '1px dashed var(--border-color)', margin: '1.5rem 0' }} />
@@ -199,69 +305,138 @@ export default function Home() {
         <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
           Kaynakları Yönet
         </h3>
+
+        {/* Canlı Arama Sistemi (V13) */}
+        <div style={{ 
+          display: 'flex', alignItems: 'center', gap: '0.8rem', 
+          background: 'rgba(30, 41, 59, 0.4)', border: '1px solid var(--border-color)', 
+          borderRadius: '12px', padding: '0.4rem 1rem', marginBottom: '2rem',
+          transition: 'all 0.3s',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)'
+        }}>
+          <Search size={18} color="var(--primary-color)" />
+          <input 
+            type="text" 
+            placeholder="Kaynaklarda veya klasörlerde ara..." 
+            value={manageSearch}
+            onChange={(e) => setManageSearch(e.target.value)}
+            style={{ flex: 1, padding: '0.6rem 0', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-color)', fontSize: '0.95rem' }}
+          />
+        </div>
+
         {links.length === 0 ? (
           <p style={{ color: 'var(--text-light)', fontStyle: 'italic' }}>Henüz hiç kaynak eklemediniz.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-             {Object.keys(groupedLinks).sort().map(folderName => (
-               <div key={folderName}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                   <h4 style={{ fontSize: '1.05rem', color: 'var(--text-color)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                     <Folder size={18} color="var(--primary-color)" /> {folderName} ({groupedLinks[folderName].length})
-                   </h4>
-                   <button 
-                     onClick={() => {
-                       setConfirmModal({
-                          message: `"${folderName}" klasöründeki ${groupedLinks[folderName].length} kaynağın tamamı silinecek. Emin misiniz?`,
-                          onConfirm: () => {
-                            groupedLinks[folderName].forEach(link => deleteRssLink(link.id));
-                            setLinks(getRssLinks());
-                            setConfirmModal(null);
-                            showToast(`"${folderName}" klasörü silindi.`);
-                          }
-                        })
-                     }}
-                     className="btn"
-                     style={{ 
-                       border: 'none', 
-                       color: 'var(--danger-color)', 
-                       fontWeight: '700', 
-                       fontSize: '0.9rem',
-                       background: 'transparent',
-                       padding: '0.4rem 0.8rem'
-                     }}
-                     title="Klasördeki tüm kaynakları sil"
-                   >
-                     Klasörü Sil
-                   </button>
-                 </div>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                   {groupedLinks[folderName].map(link => (
-                     <div key={link.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.2rem', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ overflow: 'hidden', paddingRight: '1rem' }}>
-                          <div style={{ fontSize: '0.95rem', color: 'var(--text-color)', fontWeight: '500', wordBreak: 'break-all' }}>{link.url}</div>
-                        </div>
-                        <button 
-                           onClick={() => handleDelete(link.id)} 
-                           className="btn" 
-                           title="Kaynağı Sil" 
-                           style={{ 
-                             border: 'none', 
-                             color: 'var(--danger-color)', 
-                             fontWeight: '700', 
-                             fontSize: '0.9rem',
-                             background: 'transparent',
-                             padding: '0.4rem 0.8rem',
-                             flexShrink: 0 
-                           }}
-                        >
-                           Sil
+             {Object.keys(groupedLinks).sort().map(folderName => {
+               const folderSearchMatch = folderName.toLowerCase().includes(manageSearch.toLowerCase());
+               const folderLinks = groupedLinks[folderName].filter(link => 
+                  folderSearchMatch || 
+                  link.url.toLowerCase().includes(manageSearch.toLowerCase()) ||
+                  getDisplayName(link.url).toLowerCase().includes(manageSearch.toLowerCase())
+               );
+
+               if (manageSearch && folderLinks.length === 0) return null;
+
+               return (
+                <div key={folderName} className="fade-in">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    {editingFolder === folderName ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                        <input 
+                          autoFocus
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameFolder(folderName);
+                            if (e.key === 'Escape') setEditingFolder(null);
+                          }}
+                          style={{ 
+                            background: 'var(--bg-color)', border: '1px solid var(--primary-color)', 
+                            color: 'var(--text-color)', padding: '0.4rem 0.8rem', borderRadius: '6px',
+                            fontSize: '0.95rem', outline: 'none', width: '200px'
+                          }}
+                        />
+                        <button onClick={() => handleRenameFolder(folderName)} className="btn" style={{ padding: '4px', border: 'none', background: 'var(--primary-color)', color: 'var(--bg-color)' }} title="Kaydet">
+                          <Check size={16} />
                         </button>
-                     </div>
-                   ))}
-                 </div>
-               </div>
-             ))}
+                        <button onClick={() => setEditingFolder(null)} className="btn" style={{ padding: '4px', border: 'none' }} title="İptal">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <h4 style={{ fontSize: '1.05rem', color: 'var(--text-color)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Folder size={18} color="var(--primary-color)" style={{ flexShrink: 0 }} /> 
+                        {folderName} ({groupedLinks[folderName].length})
+                        <button 
+                          onClick={() => { setEditingFolder(folderName); setEditValue(folderName); }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-light)', cursor: 'pointer', opacity: 0.5, padding: '4px', display: 'flex', alignItems: 'center' }}
+                          onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+                          onMouseOut={(e) => e.currentTarget.style.opacity = 0.5}
+                          title="Klasör Adını Değiştir"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                      </h4>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setConfirmModal({
+                           message: `"${folderName}" klasöründeki ${groupedLinks[folderName].length} kaynağın tamamı silinecek. Emin misiniz?`,
+                           onConfirm: () => {
+                             groupedLinks[folderName].forEach(link => deleteRssLink(link.id));
+                             setLinks(getRssLinks());
+                             setConfirmModal(null);
+                             showToast(`"${folderName}" klasörü silindi.`);
+                           }
+                         })
+                      }}
+                      className="btn"
+                      style={{ 
+                        border: 'none', 
+                        color: 'var(--danger-color)', 
+                        fontWeight: '700', 
+                        fontSize: '0.9rem',
+                        background: 'transparent',
+                        padding: '0.4rem 0.8rem'
+                      }}
+                      title="Klasördeki tüm kaynakları sil"
+                    >
+                      Klasörü Sil
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                    {folderLinks.map(link => (
+                      <div key={link.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.2rem', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border-color)', transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+                         <div style={{ overflow: 'hidden', paddingRight: '1rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                           <Globe size={18} color="var(--primary-color)" style={{ opacity: 0.7, flexShrink: 0 }} />
+                           <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <span style={{ fontSize: '0.95rem', color: 'var(--text-color)', fontWeight: '700' }}>{getDisplayName(link.url)}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', opacity: 0.6, wordBreak: 'break-all', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.url}</span>
+                           </div>
+                         </div>
+                         <button 
+                            onClick={() => handleDelete(link.id)} 
+                            className="btn" 
+                            title="Kaynağı Sil" 
+                            style={{ 
+                              border: 'none', 
+                              color: 'var(--danger-color)', 
+                              fontWeight: '700', 
+                              fontSize: '0.85rem',
+                              background: 'transparent',
+                              padding: '0.4rem 0.8rem',
+                              flexShrink: 0 
+                            }}
+                         >
+                            Sil
+                         </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )})}
           </div>
         )}
       </section>

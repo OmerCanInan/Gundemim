@@ -33,13 +33,18 @@ export default function NewsFeed() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false); // Arka plan yenileme
   const [error, setError] = useState(null);
-  const [visibleCount, setVisibleCount] = useState(50); // İlk yüklemede performans için 50'ye düşürüldü
+  const [visibleCount, setVisibleCount] = useState(100); 
   const [filterForm, setFilterForm] = useState(() => getFilters());
   const [debouncedFilterForm, setDebouncedFilterForm] = useState(filterForm);
   const [tagSearch, setTagSearch] = useState(''); // Yazarak etiket araması
   const [selectedTag, setSelectedTag] = useState('');  // Karta tıklayarak seçilen etiket
   const [showTagDropdown, setShowTagDropdown] = useState(false); // Dropdown aç/kapat
   const tagDropdownRef = useRef(null); // Dışarı tıklanınca kapat
+
+  // Kaynak Durumu ve Filtreleme (Yeni)
+  const [sourceStatus, setSourceStatus] = useState({}); // { url: { status, name, error } }
+  const [selectedSource, setSelectedSource] = useState(null); // Filter by source url
+  const [showSourceStatus, setShowSourceStatus] = useState(false); // Toggle status view
 
   // AI States
   const [aiSummary, setAiSummary] = useState(null);
@@ -142,7 +147,12 @@ export default function NewsFeed() {
         let result = data;
         const currentLinksMap = getRssLinks(); // Her zaman güncel linkleri referans al
         if (targetFolder) {
-          const allowedUrls = currentLinksMap.filter(l => l.folder === targetFolder).map(l => l.url);
+          const allowedUrls = currentLinksMap
+            .filter(l => {
+              const folderName = l.folder || 'Genel';
+              return folderName === targetFolder;
+            })
+            .map(l => l.url);
           result = result.filter(item => allowedUrls.includes(item.sourceUrl));
         } else if (queryUrl) {
           result = result.filter(item => item.sourceUrl === queryUrl);
@@ -177,7 +187,10 @@ export default function NewsFeed() {
         if (searchAll || filterYesterday || targetFolder) {
           linksToFetch = getRssLinks();
           if (targetFolder) {
-            linksToFetch = linksToFetch.filter(l => l.folder === targetFolder);
+            linksToFetch = linksToFetch.filter(l => {
+              const folderName = l.folder || 'Genel';
+              return folderName === targetFolder;
+            });
           }
         } else if (queryUrl) {
           linksToFetch = [{ url: queryUrl }];
@@ -228,11 +241,16 @@ export default function NewsFeed() {
               .then(items => {
                 if (!isCancelled && requestId === latestRequestIdRef.current) {
                    setRefreshStat(prev => ({ ...prev, done: prev.done + 1 }));
+                   
+                   // Kaynak durumu güncelle (Başarılı)
+                   const sName = items && items.length > 0 ? items[0].sourceName : (linkObj.name || linkObj.url);
+                   setSourceStatus(prev => ({
+                     ...prev,
+                     [linkObj.url]: { status: 'success', name: sName, count: items?.length || 0 }
+                   }));
+
                     if (items && items.length > 0) {
                       saveNewsItems(items);
-                      // Taze veriyi merkezi cache'den besle (Senkronizasyon Fix)
-                      // NOT: Yükleme sırasında her seferinde setNews yapmak yerine, 
-                      // performans için throttle edilebilir ama şimdilik senkronizasyon için kalsın.
                       const allNews = getNewsCache();
                       setNews(sortNews(filterByContext(allNews)));
                       setLoading(false);
@@ -243,6 +261,12 @@ export default function NewsFeed() {
               .catch(err => {
                 if (!isCancelled && requestId === latestRequestIdRef.current) {
                    setRefreshStat(prev => ({ ...prev, done: prev.done + 1 }));
+                   
+                   // Kaynak durumu güncelle (Hata)
+                   setSourceStatus(prev => ({
+                     ...prev,
+                     [linkObj.url]: { status: 'error', error: err.message, name: linkObj.url }
+                   }));
                 }
                 failed.push(linkObj);
                 return { status: 'rejected', url: linkObj.url };
@@ -336,10 +360,20 @@ export default function NewsFeed() {
   const displayedNews = useMemo(() => {
     let result = [...news];
 
+    // Kaynak Filtresi (Manuel Çipler)
+    if (selectedSource) {
+      result = result.filter(item => item.sourceUrl === selectedSource);
+    }
+
     // Klasör Filtresi (Eğer URL'den geliyorsa)
     if (targetFolder) {
       const links = getRssLinks();
-      const allowedUrls = links.filter(l => l.folder === targetFolder).map(l => l.url);
+      const allowedUrls = links
+        .filter(l => {
+          const folderName = l.folder || 'Genel';
+          return folderName === targetFolder;
+        })
+        .map(l => l.url);
       result = result.filter(item => allowedUrls.includes(item.sourceUrl));
     }
 
@@ -568,11 +602,18 @@ export default function NewsFeed() {
             >
               <RefreshCw size={18} className={isRefreshing ? 'spin' : ''} />
             </button>
-            {isRefreshing && refreshStat.total > 0 && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', opacity: 0.8, fontWeight: '600' }}>
-                {refreshStat.done}/{refreshStat.total} Güncelleniyor...
-              </span>
-            )}
+            <button 
+               onClick={() => setShowSourceStatus(!showSourceStatus)}
+               style={{ 
+                 background: 'transparent', border: '1px solid var(--border-color)', 
+                 color: Object.values(sourceStatus).some(s => s.status === 'error') ? 'var(--danger-color)' : 'var(--primary-color)', 
+                 fontSize: '0.75rem', fontWeight: '700', padding: '4px 10px', borderRadius: '6px',
+                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+               }}
+            >
+               <RefreshCw size={12} className={isRefreshing ? 'spin' : ''} />
+               {isRefreshing ? `${refreshStat.done}/${refreshStat.total} Güncelleniyor...` : (Object.values(sourceStatus).some(s => s.status === 'error') ? '⚠ Kaynak Sorunu' : 'Kaynak Durumu')}
+            </button>
           </div>
         </div>
         
@@ -809,6 +850,68 @@ export default function NewsFeed() {
           </div>
         );
       })()}
+      </div>
+
+      {/* ── KAYNAK DURUM PANELİ ── */}
+      {showSourceStatus && (
+        <div className="fade-in" style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem', fontSize: '0.8rem' }}>
+          <div style={{ fontWeight: '700', marginBottom: '0.6rem', color: 'var(--text-light)', display: 'flex', justifyContent: 'space-between' }}>
+            <span>Bağlantı & Kaynak Durumları</span>
+            <button onClick={() => setShowSourceStatus(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer' }}>✕</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.4rem' }}>
+            {Object.entries(sourceStatus).map(([url, data]) => (
+              <div key={url} style={{ padding: '0.4rem 0.6rem', background: 'var(--bg-color)', borderRadius: '6px', borderLeft: `3px solid ${data.status === 'success' ? '#10b981' : '#f43f5e'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem', fontSize: '0.75rem' }}>{data.name || url}</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: '800', color: data.status === 'success' ? '#10b981' : '#f43f5e', textAlign: 'right' }}>
+                  {data.status === 'success' ? 'BAŞARILI' : 'HATA'}
+                </span>
+              </div>
+            ))}
+          </div>
+          {Object.values(sourceStatus).some(s => s.error?.includes('403') || s.error?.includes('500')) && (
+            <p style={{ marginTop: '0.6rem', fontSize: '0.7rem', color: 'var(--text-light)', fontStyle: 'italic', opacity: 0.8 }}>
+              💡 Not: "Uyumluluk Modu" (Tarayıcı Simülasyonu) sayesinde artık daha fazla kaynaktan veri alınabiliyor.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── KAYNAK SEÇİMİ (Çipler) ── */}
+      <div className="source-chips-container" style={{ 
+        display: 'flex', gap: '0.5rem', overflowX: 'auto', padding: '0.5rem 0 1rem 0', 
+        scrollbarWidth: 'none', msOverflowStyle: 'none' 
+      }}>
+        <button
+          onClick={() => setSelectedSource(null)}
+          style={{
+            padding: '0.35rem 1rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
+            whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
+            background: !selectedSource ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
+            color: !selectedSource ? 'var(--bg-color)' : 'var(--text-color)',
+            border: '1px solid var(--border-color)'
+          }}
+        >
+          Hepsi
+        </button>
+        {Object.entries(sourceStatus).sort((a,b) => (b[1].count || 0) - (a[1].count || 0)).map(([url, data]) => (
+          <button
+            key={url}
+            onClick={() => setSelectedSource(selectedSource === url ? null : url)}
+            style={{
+              padding: '0.35rem 1rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
+              whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
+              background: selectedSource === url ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
+              color: selectedSource === url ? 'var(--bg-color)' : 'var(--text-color)',
+              border: `1px solid ${data.status === 'error' ? 'var(--danger-color)' : 'var(--border-color)'}`,
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}
+          >
+            {data.status === 'error' && <span style={{ color: 'var(--danger-color)' }}>⚠</span>}
+            {data.name || url}
+            {data.count > 0 && <span style={{ opacity: 0.4, fontSize: '0.65rem' }}>{data.count}</span>}
+          </button>
+        ))}
       </div>
 
       {/* AI ÖZET MODALI */}

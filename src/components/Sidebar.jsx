@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Folder, Compass, Settings, Headphones, X, Send, Globe, Key, Square, Volume2, HelpCircle } from 'lucide-react';
-import { getRssLinks } from '../services/dbService';
+import { Search, Folder, Compass, Settings, Headphones, X, Send, Globe, Key, Square, Volume2, HelpCircle, Edit2, Check, Trash2, AlertCircle } from 'lucide-react';
+import { getRssLinks, updateFolderName, deleteFolder } from '../services/dbService';
 import { useRadio } from '../context/RadioContext';
 import { useState, useEffect } from 'react';
 
@@ -12,6 +12,9 @@ export default function Sidebar({ isOpen, closeSidebar }) {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportState, setSupportState] = useState('idle'); // idle, sending, success
   const [supportForm, setSupportForm] = useState({ email: '', subject: '', message: '' });
+  const [editingFolder, setEditingFolder] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [confirmModal, setConfirmModal] = useState(null);
 
   // Mobil navigasyon sonrası kapatma
   const handleNav = (path, search = '') => {
@@ -35,6 +38,16 @@ export default function Sidebar({ isOpen, closeSidebar }) {
 
   const handleSupportSubmit = async (e) => {
     // ... same as before
+  };
+
+  const handleRename = (e, oldName) => {
+    e.stopPropagation();
+    if (!editValue.trim() || editValue.trim() === oldName) {
+      setEditingFolder(null);
+      return;
+    }
+    updateFolderName(oldName, editValue.trim());
+    setEditingFolder(null);
   };
 
   return (
@@ -64,9 +77,70 @@ export default function Sidebar({ isOpen, closeSidebar }) {
             <div style={{ padding: '0.5rem', color: 'var(--text-light)', fontSize: '0.85rem' }}>Henüz kaynak yok.</div>
           ) : (
             folders.map((folder, idx) => (
-              <button key={idx} className={`sidebar-link ${isFolderActive(folder) ? 'active' : ''}`} onClick={() => handleNav('/news', `?folder=${encodeURIComponent(folder)}`)}>
-                <Folder size={18} /> {folder}
-              </button>
+              <div key={idx} style={{ position: 'relative', display: 'flex', alignItems: 'center' }} className="sidebar-link-container">
+                {editingFolder === folder ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.6rem 0.5rem', width: '100%', background: 'var(--bg-color)', borderRadius: '6px' }}>
+                    <Folder size={18} color="var(--primary-color)" style={{ flexShrink: 0 }} />
+                    <input 
+                      autoFocus
+                      type="text"
+                      className="sidebar-edit-input"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRename(e, folder);
+                        if (e.key === 'Escape') setEditingFolder(null);
+                      }}
+                      onBlur={(e) => handleRename(e, folder)}
+                      style={{ 
+                        background: 'transparent', border: 'none', color: 'var(--text-color)', 
+                        fontSize: '0.95rem', outline: 'none', width: '100%', padding: 0 
+                      }}
+                    />
+                    <button onClick={(e) => handleRename(e, folder)} style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                       <Check size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button className={`sidebar-link ${isFolderActive(folder) ? 'active' : ''}`} onClick={() => handleNav('/news', `?folder=${encodeURIComponent(folder)}`)}>
+                      <Folder size={18} style={{ flexShrink: 0 }} /> {folder}
+                    </button>
+                    <div 
+                      className="sidebar-edit-btn"
+                      style={{ 
+                        position: 'absolute', right: '10px', display: 'flex', gap: '4px',
+                        background: 'transparent', border: 'none', color: 'var(--text-light)', 
+                        opacity: 0, transition: 'opacity 0.2s' 
+                      }}
+                    >
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); setEditValue(folder); }}
+                        style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '4px' }}
+                        title="Klasörü Düzenle"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setConfirmModal({
+                            message: `"${folder}" klasöründeki tüm kaynaklar silinecek. Emin misiniz?`,
+                            onConfirm: () => {
+                              deleteFolder(folder);
+                              setConfirmModal(null);
+                            }
+                          });
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '4px' }}
+                        title="Klasörü Sil"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             ))
           )}
         </div>
@@ -142,6 +216,34 @@ export default function Sidebar({ isOpen, closeSidebar }) {
           </button>
         </div>
       </aside>
+
+      {/* ONAY MODALI (Sidebar için Global) */}
+      {confirmModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11000
+        }} onClick={() => setConfirmModal(null)}>
+          <div className="fade-in" style={{
+            background: 'var(--bg-secondary)', borderRadius: '16px', padding: '1.5rem',
+            border: '1px solid var(--border-color)', maxWidth: '300px', width: '85%',
+            boxShadow: 'var(--shadow-modal)'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.2rem' }}>
+              <AlertCircle size={20} color="var(--danger-color)" />
+              <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.4', color: 'var(--text-color)' }}>{confirmModal.message}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmModal(null)} style={{ padding: '0.5rem 1rem', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-color)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                İptal
+              </button>
+              <button onClick={confirmModal.onConfirm} style={{ padding: '0.5rem 1rem', borderRadius: '6px', background: 'var(--danger-color)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                Evet, Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
 

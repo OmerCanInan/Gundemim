@@ -103,6 +103,41 @@ export const deleteRssLink = (id) => {
   window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
 };
 
+/**
+ * Belirli bir klasör ismini toplu olarak günceller.
+ * @param {string} oldName - Mevcut klasör adı
+ * @param {string} newName - Yeni klasör adı
+ */
+export const updateFolderName = (oldName, newName) => {
+  let links = getRssLinks();
+  const safeOld = oldName === 'Genel' ? '' : oldName.trim();
+  const safeNew = newName === 'Genel' ? '' : newName.trim();
+
+  links = links.map(link => {
+    if ((link.folder || '') === safeOld) {
+      return { ...link, folder: safeNew };
+    }
+    return link;
+  });
+
+  localStorage.setItem(DB_KEY, JSON.stringify(links));
+  window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
+};
+
+/**
+ * Belirli bir klasörü ve içindeki tüm linkleri siler.
+ * @param {string} folderName - Silinecek klasör adı
+ */
+export const deleteFolder = (folderName) => {
+  let links = getRssLinks();
+  const safeFolder = folderName === 'Genel' ? '' : folderName.trim();
+
+  links = links.filter(link => (link.folder || '') !== safeFolder);
+
+  localStorage.setItem(DB_KEY, JSON.stringify(links));
+  window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
+};
+
 // ==========================================
 // HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI
 // ==========================================

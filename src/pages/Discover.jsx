@@ -30,7 +30,6 @@ const DISCOVER_FEEDS = [
     { name: "FRPNET", url: "https://frpnet.net/feed/" },
     { name: "Kayıp Rıhtım", url: "https://kayiprihtim.com/feed/" },
     { name: "Multiplayer", url: "https://multiplayer.com.tr/feed/" },
-    { name: "Merlin'in Kazanı", url: "https://www.merlininkazani.com/rss" },
     { name: "Eurogamer", url: "https://www.eurogamer.net/rss" },
     { name: "PC Gamer", url: "https://www.pcgamer.com/rss/" },
     { name: "Polygon", url: "https://www.polygon.com/rss/index.xml" }
@@ -96,7 +95,6 @@ const READY_PACKAGES = [
       { name: "FRPNET", url: "https://frpnet.net/feed/" },
       { name: "Kayıp Rıhtım", url: "https://kayiprihtim.com/feed/" },
       { name: "Multiplayer", url: "https://multiplayer.com.tr/feed/" },
-      { name: "Merlin'in Kazanı", url: "https://www.merlininkazani.com/rss" },
       { name: "Eurogamer", url: "https://www.eurogamer.net/rss" },
       { name: "Technopat Oyun", url: "https://www.technopat.net/sosyal/bolum/oyun-haberleri.11/index.rss" }
     ]

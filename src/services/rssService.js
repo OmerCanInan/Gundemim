@@ -508,6 +508,6 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
 
   } catch (error) {
     console.error(`RSS çekilirken hata: ${url}`, error);
-    return [];
+    throw error;
   }
 };

@@ -99,28 +99,52 @@ ipcMain.handle('get-api-key', async () => {
 
 // IPC: RSS Fetching (Audit: Move RSS fetching to Main)
 ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 10000) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
   const cleanUrl = url.trim();
-  console.log(`[IPC:fetch-rss] Requesting: ${cleanUrl} (Timeout: ${timeoutMs}ms)`);
+  
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8',
+    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Referer': 'https://www.google.com/',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'cross-site',
+    'Upgrade-Insecure-Requests': '1'
+  };
+
+  const attemptFetch = async (targetUrl) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      console.log(`[IPC:fetch-rss] Requesting: ${targetUrl}`);
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: headers
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      return await response.text();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  };
 
   try {
-    const response = await fetch(cleanUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Cache-Control': 'no-cache'
-      }
-    });
-    
-    console.log(`[IPC:fetch-rss] Response: ${response.status} for ${cleanUrl}`);
-    
-    clearTimeout(timeoutId);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return await response.text();
+    return await attemptFetch(cleanUrl);
   } catch (error) {
-    clearTimeout(timeoutId);
+    // Retry Strategy (V6): HTTP -> HTTPS Fallback
+    if (cleanUrl.startsWith('http://')) {
+      const httpsUrl = cleanUrl.replace('http://', 'https://');
+      console.log(`[IPC:fetch-rss] Retrying with HTTPS: ${httpsUrl}`);
+      try {
+        return await attemptFetch(httpsUrl);
+      } catch (retryError) {
+        throw new Error(`HTTP & HTTPS failed: ${retryError.message}`);
+      }
+    }
     throw error;
   }
 });
