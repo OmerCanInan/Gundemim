@@ -98,7 +98,7 @@ ipcMain.handle('get-api-key', async () => {
 });
 
 // IPC: RSS Fetching (Audit: Move RSS fetching to Main)
-ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 10000) => {
+ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 20000) => {
   const cleanUrl = url.trim();
   
   const headers = {

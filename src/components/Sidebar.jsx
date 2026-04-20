@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Folder, Compass, Settings, Headphones, X, Send, Globe, Key, Square, Volume2, HelpCircle, Edit2, Check, Trash2, AlertCircle } from 'lucide-react';
+import { Search, Folder, Compass, Settings, Headphones, X, Send, Globe, Key, Square, Volume2, HelpCircle, Edit2, Check, Trash2, AlertCircle, Clock } from 'lucide-react';
 import { getRssLinks, updateFolderName, deleteFolder } from '../services/dbService';
 import { useRadio } from '../context/RadioContext';
 import { useState, useEffect } from 'react';
@@ -61,10 +61,13 @@ export default function Sidebar({ isOpen, closeSidebar }) {
             </button>
           </div>
           <button className={`sidebar-link ${isActive('/news', '?all=true') ? 'active' : ''}`} onClick={() => handleNav('/news', '?all=true')}>
-            <Search size={18} /> Tüm Haberler
+            <Clock size={18} /> Tüm Haberler
+          </button>
+          <button className={`sidebar-link ${isActive('/news', '?filter=today') ? 'active' : ''}`} onClick={() => handleNav('/news', '?filter=today')}>
+            <Search size={18} /> Bugünün Haberleri
           </button>
           <button className={`sidebar-link ${isActive('/news', '?filter=yesterday') ? 'active' : ''}`} onClick={() => handleNav('/news', '?filter=yesterday')}>
-            <Compass size={18} /> Dünün Özeti
+            <Compass size={18} /> Dünün Haberleri
           </button>
           <button className={`sidebar-link ${isActive('/discover') ? 'active' : ''}`} onClick={() => handleNav('/discover')}>
             <Globe size={18} /> Keşfet

@@ -8,11 +8,10 @@ const DISCOVER_FEEDS = [
   { folder: "Haber & Gündem", feeds: [
     { name: "TRT Haber", url: "https://www.trthaber.com/sondakika_articles.rss" },
     { name: "NTV Son Dakika", url: "https://www.ntv.com.tr/son-dakika.rss" },
-    { name: "Sözcü", url: "https://www.sozcu.com.tr/rss" },
+    { name: "Sözcü", url: "https://www.sozcu.com.tr/feeds-rss-category-gundem" },
     { name: "Cumhuriyet", url: "https://www.cumhuriyet.com.tr/rss" },
     { name: "BirGün", url: "https://www.birgun.net/xml/rss.xml" },
     { name: "Gazete Duvar", url: "https://www.gazeteduvar.com.tr/rss" },
-    { name: "T24", url: "https://t24.com.tr/rss" },
     { name: "Diken", url: "https://www.diken.com.tr/feed/" },
     { name: "Habertürk", url: "https://www.haberturk.com/rss" },
     { name: "Hürriyet", url: "https://www.hurriyet.com.tr/rss/anasayfa" },
@@ -49,27 +48,20 @@ const DISCOVER_FEEDS = [
   { folder: "Ekonomi & Finans", feeds: [
     { name: "Bloomberg HT", url: "https://www.bloomberght.com/rss" },
     { name: "Ekonomim", url: "https://www.ekonomim.com/rss" },
-    { name: "Para Analiz", url: "https://www.paranaliz.com/feed/" },
     { name: "Borsagündem", url: "https://www.borsagundem.com.tr/rss" },
     { name: "Dünya Gazetesi", url: "https://www.dunya.com/rss" },
-    { name: "Bigpara", url: "https://bigpara.hurriyet.com.tr/rss/sondakika.xml" },
+    { name: "Bigpara", url: "https://bigpara.hurriyet.com.tr/rss/" },
     { name: "Investing.com TR", url: "https://tr.investing.com/rss/news.rss" },
     { name: "Financial Times", url: "https://www.ft.com/?format=rss" }
   ]},
   { folder: "Kripto Para", feeds: [
     { name: "Koin Bülteni", url: "https://koinbulteni.com/feed" },
-    { name: "Muhabbit", url: "https://muhabbit.com/feed/" },
     { name: "BTCHaber", url: "https://www.btchaber.com/feed/" },
     { name: "Kriptokoin", url: "https://kriptokoin.com/feed/" },
     { name: "CoinDesk", url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
     { name: "Cointelegraph", url: "https://cointelegraph.com/rss" }
   ]},
   { folder: "Spor", feeds: [
-    { name: "Beinsports", url: "https://www.beinsports.com.tr/rss/haber" },
-    { name: "NTV Spor", url: "https://www.ntvspor.net/rss" },
-    { name: "Fanatik", url: "https://www.fanatik.com.tr/rss/anasayfa.xml" },
-    { name: "Fotomaç", url: "https://www.fotomac.com.tr/rss/anasayfa.xml" },
-    { name: "Sporx", url: "https://www.sporx.com/rss/haberler.xml" },
     { name: "Ajansspor", url: "https://ajansspor.com/rss" },
     { name: "Mackolik", url: "https://www.mackolik.com/rss" }
   ]},
@@ -102,17 +94,16 @@ const READY_PACKAGES = [
   {
     name: "Türkiye Medya Devi",
     emoji: "🗞️",
-    description: "TRT, NTV, Sözcü, Cumhuriyet ve daha fazlası (8 Kaynak)",
+    description: "TRT, NTV, Sözcü, Cumhuriyet ve daha fazlası (7 Kaynak)",
     color: "#e11d48",
     folder: "Haber & Gündem",
     feeds: [
       { name: "TRT Haber", url: "https://www.trthaber.com/sondakika_articles.rss" },
       { name: "NTV Son Dakika", url: "https://www.ntv.com.tr/son-dakika.rss" },
-      { name: "Sözcü", url: "https://www.sozcu.com.tr/rss" },
+      { name: "Sözcü", url: "https://www.sozcu.com.tr/feeds-rss-category-gundem" },
       { name: "Cumhuriyet", url: "https://www.cumhuriyet.com.tr/rss" },
       { name: "BirGün", url: "https://www.birgun.net/xml/rss.xml" },
       { name: "Gazete Duvar", url: "https://www.gazeteduvar.com.tr/rss" },
-      { name: "T24", url: "https://t24.com.tr/rss" },
       { name: "Habertürk", url: "https://www.haberturk.com/rss" }
     ]
   },
@@ -136,16 +127,15 @@ const READY_PACKAGES = [
   {
     name: "Finans & Borsa Pro",
     emoji: "🏙️",
-    description: "Bloomberg, Ekonomim, Borsagündem ve Para Analiz",
+    description: "Bloomberg, Ekonomim ve Borsagündem",
     color: "#059669",
     folder: "Ekonomi",
     feeds: [
       { name: "Bloomberg HT", url: "https://www.bloomberght.com/rss" },
       { name: "Ekonomim", url: "https://www.ekonomim.com/rss" },
-      { name: "Para Analiz", url: "https://www.paranaliz.com/feed/" },
       { name: "Borsagündem", url: "https://www.borsagundem.com.tr/rss" },
       { name: "Dünya Gazetesi", url: "https://www.dunya.com/rss" },
-      { name: "Bigpara", url: "https://bigpara.hurriyet.com.tr/rss/sondakika.xml" },
+      { name: "Bigpara", url: "https://bigpara.hurriyet.com.tr/rss/" },
       { name: "Investing TR", url: "https://tr.investing.com/rss/news.rss" },
       { name: "Financial Times", url: "https://www.ft.com/?format=rss" }
     ]
@@ -158,7 +148,6 @@ const READY_PACKAGES = [
     folder: "Kripto Para",
     feeds: [
       { name: "Koin Bülteni", url: "https://koinbulteni.com/feed" },
-      { name: "Muhabbit", url: "https://muhabbit.com/feed/" },
       { name: "BTCHaber", url: "https://www.btchaber.com/feed/" },
       { name: "Kriptokoin", url: "https://kriptokoin.com/feed/" },
       { name: "CoinDesk", url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },

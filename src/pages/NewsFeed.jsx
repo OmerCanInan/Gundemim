@@ -45,6 +45,7 @@ export default function NewsFeed() {
   const [sourceStatus, setSourceStatus] = useState({}); // { url: { status, name, error } }
   const [selectedSource, setSelectedSource] = useState(null); // Filter by source url
   const [showSourceStatus, setShowSourceStatus] = useState(false); // Toggle status view
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false); // Grid-based source selector
 
   // AI States
   const [aiSummary, setAiSummary] = useState(null);
@@ -53,6 +54,7 @@ export default function NewsFeed() {
 
   const queryUrl = searchParams.get('url');
   const searchAll = searchParams.get('all') === 'true';
+  const filterToday = searchParams.get('filter') === 'today';
   const filterYesterday = searchParams.get('filter') === 'yesterday';
   const targetFolder = searchParams.get('folder'); // Klasör / Etiket desteği
 
@@ -94,9 +96,10 @@ export default function NewsFeed() {
     const handleClickOutside = (e) => {
       if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) {
         setShowTagDropdown(false);
+        setShowSourceDropdown(false);
       }
     };
-    if (showTagDropdown) {
+    if (showTagDropdown || showSourceDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -138,6 +141,13 @@ export default function NewsFeed() {
     let isCancelled = false;
     const requestId = ++latestRequestIdRef.current;
 
+    // --- TEMİZ BAŞLANGIÇ (Context Reset) ---
+    // Sayfa/Klasör değiştiğinde önceki durumları anında temizle
+    setSourceStatus({});
+    setRefreshStat({ done: 0, total: 0 });
+    setNews([]); // Önceki haberleri temizle
+    setLoading(true);
+
     const loadNews = async () => {
       // 1. ANINDA YÜKLEME (Cache) 
       const initialData = getNewsCache();
@@ -159,13 +169,19 @@ export default function NewsFeed() {
         } else {
           const allowedUrls = currentLinksMap.map(l => l.url);
           result = result.filter(item => allowedUrls.includes(item.sourceUrl));
-          if (filterYesterday && !searchAll) {
-             const now = new Date();
-             const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
-             const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - 1;
+
+          const now = new Date();
+          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+
+          if (filterToday) {
+             // Bugünün Haberleri: 00:00 dan sonrası
+             result = result.filter(item => item.date.getTime() >= startOfToday);
+          } else if (filterYesterday) {
+             // Dünün Haberleri: bugünün başından dünün başına kadar (1 günlük alan)
              result = result.filter(item => {
                 const time = item.date.getTime();
-                return time >= startOfYesterday && time <= endOfYesterday;
+                return time >= startOfYesterday && time < startOfToday;
              });
           }
         }
@@ -184,7 +200,7 @@ export default function NewsFeed() {
       // 2. TURBO GÜNCELLEME (V5 Final: Two-Pass Architecture)
       try {
         let linksToFetch = [];
-        if (searchAll || filterYesterday || targetFolder) {
+        if (searchAll || filterToday || filterYesterday || targetFolder) {
           linksToFetch = getRssLinks();
           if (targetFolder) {
             linksToFetch = linksToFetch.filter(l => {
@@ -237,6 +253,9 @@ export default function NewsFeed() {
           for (const linkObj of tasks) {
             if (isCancelled || requestId !== latestRequestIdRef.current) break;
             
+            // Burst Protection Hack: Tiny delay before starting new promise
+            await new Promise(r => setTimeout(r, 50));
+
             const promise = fetchRssFeed(linkObj.url, controller.signal, timeout)
               .then(items => {
                 if (!isCancelled && requestId === latestRequestIdRef.current) {
@@ -283,18 +302,18 @@ export default function NewsFeed() {
         };
 
         // --- ÜÇ AŞAMALI AKILLI GÜNCELLEME (Triple-Pass Strategy) ---
-        // PASS 0: Kritik Öncelik (8 Saniye Limit - İlk 5-8 Kaynak)
+        // PASS 0: Kritik Öncelik (10 Saniye Limit - İlk 8 Kaynak)
         const oneHourAgo = new Date().getTime() - (60 * 60 * 1000);
         const activeSourceUrls = new Set(initialData.filter(i => i.date && i.date.getTime() > oneHourAgo).map(i => i.sourceUrl));
         const priorityLinks = linksToFetch.filter(l => activeSourceUrls.has(l.url)).slice(0, 8);
         const others = linksToFetch.filter(l => !activeSourceUrls.has(l.url) || priorityLinks.indexOf(l) === -1);
 
         if (priorityLinks.length > 0) {
-           await runTasks(priorityLinks, 4, 8000); // En aktifleri anında bitir!
+           await runTasks(priorityLinks, 6, 10000); // Önceliklileri 10s'de bitir
         }
 
-        // PASS 1: Standart Şerid (20 saniye limit)
-        const failedInPass1 = await runTasks(others, 5, 20000);
+        // PASS 1: Standart Şerit (25 saniye limit, 8 eş zamanlı)
+        const failedInPass1 = await runTasks(others, 8, 25000);
 
         // İlk iki aşama bitti, kullanıcıyı bekletmeyi bırakalım
         if (!isCancelled && requestId === latestRequestIdRef.current) {
@@ -325,19 +344,21 @@ export default function NewsFeed() {
       isCancelled = true;
       controller.abort();
     };
-  }, [queryUrl, searchAll, filterYesterday, targetFolder]);
+  }, [queryUrl, searchAll, filterToday, filterYesterday, targetFolder]);
 
   // Klasör / Kategori değiştiğinde AI özetini sıfırla (Eski özetin kalmaması için)
   useEffect(() => {
     setAiSummary(null);
     setAiError(null);
     setIsAiLoading(false);
-  }, [queryUrl, searchAll, filterYesterday, targetFolder]);
+    setSourceStatus({}); // Sayfa/Klasör değişiminde kaynak durumlarını temizle
+  }, [queryUrl, searchAll, filterToday, filterYesterday, targetFolder]);
 
   // Klasör, Tümü veya Tekil başlık seçimi
   let pageTitle = 'Arama Sonuçları';
+  if (filterToday) pageTitle = 'Bugünün Haberleri';
   if (searchAll) pageTitle = 'Tüm Haberler';
-  if (filterYesterday) pageTitle = 'Dünün Özeti';
+  if (filterYesterday) pageTitle = 'Dünün Haberleri';
   if (targetFolder) pageTitle = `Klasör: ${targetFolder}`;
 
   const handleFilterChange = (type, value) => {
@@ -408,24 +429,46 @@ export default function NewsFeed() {
     }
 
     return result;
-  }, [news, targetFolder, debouncedFilterForm, selectedTag, tagSearch]);
+  }, [news, targetFolder, debouncedFilterForm, selectedTag, tagSearch, selectedSource]);
 
   // --- ETİKET ANALİZİ (useMemo ile Optimizasyon) ---
-  const { tagFreq, allTags } = useMemo(() => {
+  const { tagFreq, allTags, sourceFreq, allSources } = useMemo(() => {
     const freq = {};
+    const srcFreq = {};
+
     news.forEach(item => {
+      // Etiket analizi
       if (Array.isArray(item.tags)) {
         item.tags.forEach(t => {
           const normalized = t.toLowerCase();
           freq[normalized] = (freq[normalized] || 0) + 1;
         });
       }
+
+      // Kaynak analizi
+      const sUrl = item.sourceUrl;
+      if (sUrl) {
+        if (!srcFreq[sUrl]) {
+          srcFreq[sUrl] = { count: 0, name: item.sourceName || sUrl };
+        }
+        srcFreq[sUrl].count++;
+      }
     });
+
     const sortedTags = Object.entries(freq)
       .sort((a, b) => b[1] - a[1])
       .map(([t]) => t);
     
-    return { tagFreq: freq, allTags: sortedTags };
+    const sortedSources = Object.entries(srcFreq)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([url]) => url);
+
+    return { 
+      tagFreq: freq, 
+      allTags: sortedTags, 
+      sourceFreq: srcFreq, 
+      allSources: sortedSources 
+    };
   }, [news]);
 
   const handleGenerateSummary = async () => {
@@ -718,46 +761,131 @@ export default function NewsFeed() {
             style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-color)', color: 'var(--text-color)', borderRadius: '6px', fontSize: '0.9rem' }}
           />
         </div>
-        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--success-color)', fontWeight: '600' }}>
-            <Tag size={16} /> Etiket Filtresi
+        <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '300px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--success-color)', fontWeight: '600' }}>
+            <Sparkles size={16} /> Filtre Panelini Özelleştir
           </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {/* Aktif tag varsa chip göster */}
-            {selectedTag && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '0.4rem 0.9rem', borderRadius: '20px', fontSize: '0.85rem',
-                fontWeight: '700', background: 'rgba(16,185,129,0.15)',
-                color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.4)',
-                letterSpacing: '0.04em', flexShrink: 0,
-              }}>
-                {selectedTag}
-                <button
-                  onClick={() => { setSelectedTag(''); setTagSearch(''); }}
-                  style={{ background: 'none', border: 'none', color: '#6ee7b7', cursor: 'pointer', padding: '0', lineHeight: 1, fontSize: '1rem', display: 'flex', alignItems: 'center' }}
-                >✕</button>
-              </span>
-            )}
-            {/* Dropdown aç/kapat butonu */}
-            <button
-              onClick={() => setShowTagDropdown(p => !p)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '0.6rem 1rem', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: '600',
-                border: showTagDropdown ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
-                background: showTagDropdown ? 'rgba(16,185,129,0.1)' : 'var(--bg-color)',
-                color: showTagDropdown ? 'var(--success-color)' : 'var(--text-color)',
-                transition: 'all 0.18s ease', whiteSpace: 'nowrap',
-              }}
-            >
-              <Tag size={14} /> Etiketler {showTagDropdown ? '▲' : '▼'}
-            </button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
+            
+            {/* KAYNAK SEÇİCİ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {selectedSource && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '0.4rem 0.9rem', borderRadius: '20px', fontSize: '0.85rem',
+                  fontWeight: '700', background: 'rgba(59,130,246,0.15)',
+                  color: '#93c5fd', border: '1px solid rgba(59,130,246,0.4)',
+                  letterSpacing: '0.04em', flexShrink: 0,
+                }}>
+                  {sourceFreq[selectedSource]?.name || selectedSource}
+                  <button
+                    onClick={() => setSelectedSource(null)}
+                    style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: '0', lineHeight: 1, fontSize: '1rem', display: 'flex', alignItems: 'center' }}
+                  >✕</button>
+                </span>
+              )}
+              <button
+                onClick={() => { setShowSourceDropdown(p => !p); setShowTagDropdown(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '0.6rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                  fontSize: '0.85rem', fontWeight: '600',
+                  border: showSourceDropdown ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  background: showSourceDropdown ? 'rgba(59,130,246,0.1)' : 'var(--bg-color)',
+                  color: showSourceDropdown ? 'var(--primary-color)' : 'var(--text-color)',
+                  transition: 'all 0.18s ease', whiteSpace: 'nowrap',
+                }}
+              >
+                <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} /> Kaynaklar {showSourceDropdown ? '▲' : '▼'}
+              </button>
+            </div>
+
+            {/* ETİKET SEÇİCİ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {selectedTag && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '0.4rem 0.9rem', borderRadius: '20px', fontSize: '0.85rem',
+                  fontWeight: '700', background: 'rgba(16,185,129,0.15)',
+                  color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.4)',
+                  letterSpacing: '0.04em', flexShrink: 0,
+                }}>
+                  {selectedTag}
+                  <button
+                    onClick={() => { setSelectedTag(''); setTagSearch(''); }}
+                    style={{ background: 'none', border: 'none', color: '#6ee7b7', cursor: 'pointer', padding: '0', lineHeight: 1, fontSize: '1rem', display: 'flex', alignItems: 'center' }}
+                  >✕</button>
+                </span>
+              )}
+              <button
+                onClick={() => { setShowTagDropdown(p => !p); setShowSourceDropdown(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '0.6rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                  fontSize: '0.85rem', fontWeight: '600',
+                  border: showTagDropdown ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
+                  background: showTagDropdown ? 'rgba(16,185,129,0.1)' : 'var(--bg-color)',
+                  color: showTagDropdown ? 'var(--success-color)' : 'var(--text-color)',
+                  transition: 'all 0.18s ease', whiteSpace: 'nowrap',
+                }}
+              >
+                <Tag size={14} /> Etiketler {showTagDropdown ? '▲' : '▼'}
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
 
+      {/* ── KAYNAK SEÇİM PANELİ (Dropdown) ── */}
+      {showSourceDropdown && news.length > 0 && (
+        <div className="fade-in" style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 300,
+          background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+          borderRadius: '10px', padding: '1rem', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(10px)', marginBottom: '1rem',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <RefreshCw size={14} /> Haber Kaynağı Seç <span style={{ color: 'var(--text-light)', fontWeight: '400' }}>({allSources.length} kaynak)</span>
+            </span>
+            <button onClick={() => setShowSourceDropdown(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.1rem', padding: '0 4px' }}>✕</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.6rem' }}>
+            <button
+               onClick={() => { setSelectedSource(null); setShowSourceDropdown(false); }}
+               style={{
+                 padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700',
+                 textAlign: 'left', border: !selectedSource ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                 background: !selectedSource ? 'rgba(59,130,246,0.15)' : 'var(--bg-color)', color: 'var(--text-color)',
+                 display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+               }}
+            >
+              <span>🌐 Tüm Kaynaklar</span>
+              <span style={{ fontSize: '0.72rem', opacity: 0.6, background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '8px' }}>{news.length}</span>
+            </button>
+            {allSources.map(url => {
+              const data = sourceFreq[url];
+              const isSelected = selectedSource === url;
+              return (
+                <button
+                  key={url}
+                  onClick={() => { setSelectedSource(isSelected ? null : url); setShowSourceDropdown(false); }}
+                  style={{
+                    padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700',
+                    textAlign: 'left', border: isSelected ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                    background: isSelected ? 'rgba(59,130,246,0.15)' : 'var(--bg-color)', color: 'var(--text-color)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '6px' }}>{data.name}</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.6, background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '8px' }}>{data.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {/* ── DROPDOWN PANEL ── — filter alanının altında açılır */}
       {showTagDropdown && news.length > 0 && (() => {
         const TAG_COLORS = [
@@ -876,43 +1004,6 @@ export default function NewsFeed() {
           )}
         </div>
       )}
-
-      {/* ── KAYNAK SEÇİMİ (Çipler) ── */}
-      <div className="source-chips-container" style={{ 
-        display: 'flex', gap: '0.5rem', overflowX: 'auto', padding: '0.5rem 0 1rem 0', 
-        scrollbarWidth: 'none', msOverflowStyle: 'none' 
-      }}>
-        <button
-          onClick={() => setSelectedSource(null)}
-          style={{
-            padding: '0.35rem 1rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
-            whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
-            background: !selectedSource ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
-            color: !selectedSource ? 'var(--bg-color)' : 'var(--text-color)',
-            border: '1px solid var(--border-color)'
-          }}
-        >
-          Hepsi
-        </button>
-        {Object.entries(sourceStatus).sort((a,b) => (b[1].count || 0) - (a[1].count || 0)).map(([url, data]) => (
-          <button
-            key={url}
-            onClick={() => setSelectedSource(selectedSource === url ? null : url)}
-            style={{
-              padding: '0.35rem 1rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
-              whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
-              background: selectedSource === url ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
-              color: selectedSource === url ? 'var(--bg-color)' : 'var(--text-color)',
-              border: `1px solid ${data.status === 'error' ? 'var(--danger-color)' : 'var(--border-color)'}`,
-              display: 'flex', alignItems: 'center', gap: '6px'
-            }}
-          >
-            {data.status === 'error' && <span style={{ color: 'var(--danger-color)' }}>⚠</span>}
-            {data.name || url}
-            {data.count > 0 && <span style={{ opacity: 0.4, fontSize: '0.65rem' }}>{data.count}</span>}
-          </button>
-        ))}
-      </div>
 
       {/* AI ÖZET MODALI */}
       {isAiModalOpen && (

@@ -34,8 +34,12 @@ export const getRssLinks = () => {
       'trthaber.com/manset_ilan.rss': 'trthaber.com/manset_articles.rss',
       'milliyet.com.tr/rss/rsshesapla.xml?anakategoriid=1': 'milliyet.com.tr/rss/rssNew/gundemRss.xml',
       'fotomac.com.tr/rss/tum': 'fotomac.com.tr/rss/anasayfa.xml',
-      'fanatik.com.tr/rss': 'fanatik.com.tr/rss/anasayfa.xml',
-      'sporx.com/rss/': 'sporx.com/rss/haberler.xml'
+      'fanatik.com.tr/rss/anasayfa.xml': 'fanatik.com.tr/rss',
+      'sporx.com/rss/haberler.xml': 'sporx.com/rss',
+      'sozcu.com.tr/rss': 'sozcu.com.tr/feeds-rss-category-gundem',
+      't24.com.tr/rss': 't24.com.tr/feed',
+      'paranaliz.com/feed/': 'paranaliz.com/feed',
+      'bigpara.hurriyet.com.tr/rss/sondakika.xml': 'bigpara.hurriyet.com.tr/rss/'
     };
 
     links = links.map(link => {
@@ -146,11 +150,26 @@ export const getNewsCache = () => {
   try {
     const data = localStorage.getItem(NEWS_CACHE_KEY);
     let cached = data ? JSON.parse(data) : [];
+    let hasDirtyLinks = false;
+    
     // Tarih string'lerini anında JS Date objelerine dönüştür
     cached = cached.map(item => {
       item.date = new Date(item.date);
+
+      // AUTO-FIX: Relative linkleri onar (Örn: Bigpara'dan gelen /haber/...)
+      if (item.link && item.link.startsWith('/') && !item.link.startsWith('//') && item.sourceUrl) {
+        try {
+          const rootUrl = new URL(item.sourceUrl);
+          item.link = `${rootUrl.protocol}//${rootUrl.hostname}${item.link}`;
+          hasDirtyLinks = true;
+        } catch (e) {}
+      }
       return item;
     });
+
+    if (hasDirtyLinks) {
+       localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
+    }
     return cached;
   } catch (error) {
     console.error('Haber önbelleği okunamadı:', error);

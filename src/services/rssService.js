@@ -428,13 +428,31 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
       let description = item.querySelector('description')?.textContent || item.querySelector('summary')?.textContent || '';
       
       // Atom feed'lerde link attr href içindedir
-      let linkNode = item.querySelector('link');
       let link = '#';
+      // RSS link tagı
+      const linkNode = item.querySelector('link');
       if (linkNode) {
-          link = linkNode.textContent.trim();
-          if (!link || link.startsWith('\n')) {
-              link = linkNode.getAttribute('href') || '#';
-          }
+        link = linkNode.textContent.trim();
+        // Eğer text boşsa attribute (Atom) kontrol et
+        if (!link || link.startsWith('\n')) {
+          link = linkNode.getAttribute('href') || '#';
+        }
+      }
+
+      // Bazı feedlerde link guid içinde olabilir
+      if (link === '#' || !link.startsWith('http')) {
+        const guidNode = item.querySelector('guid');
+        if (guidNode && guidNode.textContent.startsWith('http')) {
+          link = guidNode.textContent.trim();
+        }
+      }
+
+      // Link hala relative ise (/) ana domain ile birleştir
+      if (link.startsWith('/') && !link.startsWith('//')) {
+        try {
+          const rootUrl = new URL(url);
+          link = `${rootUrl.protocol}//${rootUrl.hostname}${link}`;
+        } catch(e) {}
       }
       
       // Tarih Parsing (RSS: pubDate, Atom: published/updated)

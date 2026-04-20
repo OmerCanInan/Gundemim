@@ -1,4 +1,4 @@
-import { X, Rss, Key, HelpCircle, Info, ExternalLink, MousePointerClick, CheckCircle, Compass } from 'lucide-react';
+import { X, Rss, Key, HelpCircle, Info, ExternalLink, MousePointerClick, CheckCircle, Compass, Sparkles, Headphones } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function HowToUseDrawer({ isOpen, onClose }) {
@@ -38,7 +38,41 @@ export default function HowToUseDrawer({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* [NEW] Quick Start / Discover CTA - REVISED V8 */}
+        {/* Section 0: Sitenin Amaçları */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h3 style={{ fontSize: '1rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+            <Info size={18} color="#3b82f6" /> Gündemim Neyi Amaçlar?
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ padding: '6px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px' }}><CheckCircle size={16} color="#3b82f6" /></div>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.5' }}><strong>Tek Merkez:</strong> Onlarca haber sitesini tek tek gezmek yerine tüm akışı tek bir ekranda toplar.</p>
+             </div>
+             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ padding: '6px', background: 'rgba(16,185,129,0.1)', borderRadius: '8px' }}><Sparkles size={16} color="var(--success-color)" /></div>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.5' }}><strong>Zaman Tasarrufu:</strong> AI özet özelliği ile saatler sürecek okumayı saniyelere indirir.</p>
+             </div>
+             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ padding: '6px', background: 'rgba(249,115,22,0.1)', borderRadius: '8px' }}><Headphones size={16} color="#f97316" /></div>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.5' }}><strong>Haber Radyosu:</strong> Okumaya vaktiniz olmadığında haberleri sizin için profesyonelce seslendirir.</p>
+             </div>
+          </div>
+        </section>
+
+        {/* Section 1: RSS Linklerini Bulma */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h3 style={{ fontSize: '1rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+            <Rss size={18} color="#f97316" /> RSS Linklerini Bulma
+          </h3>
+          <ul style={{ paddingLeft: '1.2rem', color: 'var(--text-light)', fontSize: '0.9rem', lineHeight: '1.7' }}>
+            <li>Favori haber sitenizin en altına inin, genelde <strong>RSS</strong> ikonu bulunur.</li>
+            <li>Google'da <strong>"Site Adı + RSS"</strong> şeklinde arama yapın.</li>
+            <li>Popüler sitelerin (örn: <i>DonanımHaber, ShiftDelete</i>) ana sayfalarında genellikle RSS servisleri açıktır.</li>
+            <li>Tarayıcı eklentileri (RSS Finder vb.) kullanarak linkleri saniyeler içinde yakalayabilirsiniz.</li>
+          </ul>
+        </section>
+
+        {/* Section 2: Quick Start / Discover CTA */}
         <div 
           onClick={() => {
             onClose();
@@ -64,7 +98,7 @@ export default function HowToUseDrawer({ isOpen, onClose }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Compass size={18} color="var(--success-color)" />
-              <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--success-color)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>HIZLI BAŞLANGIÇ</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--success-color)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Veya Hızlı Başlayın</span>
             </div>
             <div style={{ background: 'var(--success-color)', color: '#fff', padding: '2px 8px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 'bold' }}>
               ÖNERİLEN
@@ -96,22 +130,11 @@ export default function HowToUseDrawer({ isOpen, onClose }) {
             Şimdi Keşfet'e Git <Compass size={16} />
           </div>
         </div>
-        <section style={{ marginBottom: '2.5rem' }}>
-          <h3 style={{ fontSize: '1rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <Rss size={18} color="#f97316" /> RSS Linklerini Bulma
-          </h3>
-          <ul style={{ paddingLeft: '1.2rem', color: 'var(--text-light)', fontSize: '0.9rem', lineHeight: '1.7' }}>
-            <li>Favori haber sitenizin en altına inin, genelde <strong>RSS</strong> ikonu bulunur.</li>
-            <li>Google'da <strong>"Site Adı + RSS"</strong> şeklinde arama yapın.</li>
-            <li>Popüler sitelerin (örn: <i>DonanımHaber, ShiftDelete</i>) ana sayfalarında genellikle RSS servisleri açıktır.</li>
-            <li>Tarayıcı eklentileri (RSS Finder vb.) kullanarak linkleri saniyeler içinde yakalayabilirsiniz.</li>
-          </ul>
-        </section>
 
-        {/* Section 2: API Key Alma (Simplified) */}
+        {/* Section 3: AI Key Alma */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h3 style={{ fontSize: '1rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <Key size={18} color="var(--primary-color)" /> AI Anahtarı Almak
+            <Key size={18} color="var(--primary-color)" /> AI Özeti ve Anahtar Almak
           </h3>
           <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
             <div style={{ marginBottom: '1rem', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -140,27 +163,6 @@ export default function HowToUseDrawer({ isOpen, onClose }) {
           >
             <ExternalLink size={16} /> Groq Console'a Git
           </a>
-        </section>
-
-        {/* Section 3: Genel İpuçları */}
-        <section style={{ marginBottom: '2rem' }}>
-          <h3 style={{ fontSize: '1rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <Info size={18} color="#3b82f6" /> Önemli Bilgiler
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <CheckCircle size={16} color="var(--success-color)" />
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>Haberleri klasörleyerek daha düzenli takip edebilirsiniz.</p>
-             </div>
-             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <CheckCircle size={16} color="var(--success-color)" />
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>AI özeti binlerce haberi saniyeler içinde sizin için süzer.</p>
-             </div>
-             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <CheckCircle size={16} color="var(--success-color)" />
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>Radyo özelliği ile yoldayken haberleri dinleyebilirsiniz.</p>
-             </div>
-          </div>
         </section>
 
         <div style={{ marginTop: 'auto', paddingTop: '2rem', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-light)', textAlign: 'center', opacity: 0.6 }}>
