@@ -1,15 +1,10 @@
 // src/services/dbService.js
 // Uygulamamızda veritabanı olarak şimdilik LocalStorage kullanıyoruz.
 // Clean Architecture prensiplerine uymak için veritabanı işlemlerini bu serviste soyutladık.
-import { Capacitor } from '@capacitor/core';
-import { Preferences } from '@capacitor/preferences';
-
-let _migrationDone = false;
 
 const DB_KEY = 'rss_links_db';
 const NEWS_CACHE_KEY = 'rss_news_cache';
-const CACHE_RETENTION_DAYS = 7; // Yasal limit: 7 günden eski haberleri otomatik siler.
-
+const CACHE_RETENTION_DAYS = 3; // Yasal limit: 3 günden eski haberleri otomatik siler.
 
 /**
  * Benzersiz ID üretici (Modern tarayıcı yoksa fallback kullanır)
@@ -30,7 +25,7 @@ export const getRssLinks = () => {
   try {
     const data = localStorage.getItem(DB_KEY);
     let links = data ? JSON.parse(data) : [];
-    
+
     // --- OTOMATİK ONARIM VE TEMİZLİK (Self-Healing Fix) ---
     // Ölmek üzere olan veya değişen RSS linklerini güncelliyoruz
     let hasMigration = false;
@@ -39,20 +34,16 @@ export const getRssLinks = () => {
       'trthaber.com/manset_ilan.rss': 'trthaber.com/manset_articles.rss',
       'milliyet.com.tr/rss/rsshesapla.xml?anakategoriid=1': 'milliyet.com.tr/rss/rssNew/gundemRss.xml',
       'fotomac.com.tr/rss/tum': 'fotomac.com.tr/rss/anasayfa.xml',
-      'fanatik.com.tr/rss/anasayfa.xml': 'fanatik.com.tr/rss',
-      'sporx.com/rss/haberler.xml': 'sporx.com/rss',
-      'sozcu.com.tr/rss': 'sozcu.com.tr/feeds-rss-category-gundem',
-      't24.com.tr/rss': 't24.com.tr/feed',
-      'paranaliz.com/feed/': 'paranaliz.com/feed',
-      'bigpara.hurriyet.com.tr/rss/sondakika.xml': 'bigpara.hurriyet.com.tr/rss/'
+      'fanatik.com.tr/rss': 'fanatik.com.tr/rss/anasayfa.xml',
+      'sporx.com/rss/': 'sporx.com/rss/haberler.xml'
     };
 
     links = links.map(link => {
       // Önce varsa bozulan linkleri (tekrar eden kelimeleri) temizle
       if (link.url.includes('haberler.xmlhaberler.xml') || link.url.includes('anasayfa.xml/anasayfa.xml')) {
-         link.url = link.url.replace(/(haberler\.xml)+/g, 'haberler.xml');
-         link.url = link.url.replace(/(\/anasayfa\.xml)+/g, '/anasayfa.xml');
-         hasMigration = true;
+        link.url = link.url.replace(/(haberler\.xml)+/g, 'haberler.xml');
+        link.url = link.url.replace(/(\/anasayfa\.xml)+/g, '/anasayfa.xml');
+        hasMigration = true;
       }
 
       // Güvenli değişim: Sadece eski linkle BİTİYORSA değiştir (Recursion Fix)
@@ -86,7 +77,7 @@ export const addRssLink = (url, folder = '') => {
   const links = getRssLinks();
   const safeFolder = folder.trim();
   const existing = links.find(link => link.url === url && link.folder === safeFolder);
-  
+
   if (existing) return false;
 
   const newLink = {
@@ -112,214 +103,89 @@ export const deleteRssLink = (id) => {
   window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
 };
 
-/**
- * Belirli bir klasör ismini toplu olarak günceller.
- * @param {string} oldName - Mevcut klasör adı
- * @param {string} newName - Yeni klasör adı
- */
-export const updateFolderName = (oldName, newName) => {
-  let links = getRssLinks();
-  const safeOld = oldName === 'Genel' ? '' : oldName.trim();
-  const safeNew = newName === 'Genel' ? '' : newName.trim();
-
-  links = links.map(link => {
-    if ((link.folder || '') === safeOld) {
-      return { ...link, folder: safeNew };
-    }
-    return link;
-  });
-
-  localStorage.setItem(DB_KEY, JSON.stringify(links));
-  window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
-};
-
-/**
- * Belirli bir klasörü ve içindeki tüm linkleri siler.
- * @param {string} folderName - Silinecek klasör adı
- */
-export const deleteFolder = (folderName) => {
-  let links = getRssLinks();
-  const safeFolder = folderName === 'Genel' ? '' : folderName.trim();
-
-  links = links.filter(link => (link.folder || '') !== safeFolder);
-
-  localStorage.setItem(DB_KEY, JSON.stringify(links));
-  window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
-};
-
 // ==========================================
-// HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI (IndexedDB)
+// HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI
 // ==========================================
 
-const IDB_NAME = 'GundemimDB';
-const IDB_VERSION = 1;
-const STORE_NAME = 'news_cache';
-
-const getDB = () => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
-    };
-  });
-};
-
-export const migrateLocalStorageToIndexedDB = async () => {
-  if (_migrationDone) return;
-  _migrationDone = true;
-
+export const getNewsCache = () => {
   try {
     const data = localStorage.getItem(NEWS_CACHE_KEY);
-    if (!data) return;
-    const cached = JSON.parse(data);
-    if (!Array.isArray(cached) || cached.length === 0) return;
-
-    const db = await getDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    
-    // Clear old store first
-    store.clear();
-
-    for (const item of cached) {
-      if (typeof item.date === 'string') {
-        item.date = new Date(item.date);
-      }
-      store.put(item);
-    }
-
-    return new Promise((resolve) => {
-      tx.oncomplete = () => {
-        localStorage.removeItem(NEWS_CACHE_KEY);
-        console.log("Migrated localStorage to IndexedDB successfully.");
-        resolve();
-      };
+    let cached = data ? JSON.parse(data) : [];
+    // Tarih string'lerini anında JS Date objelerine dönüştür
+    cached = cached.map(item => {
+      item.date = new Date(item.date);
+      return item;
     });
-  } catch (err) {
-    console.error("Migration failed:", err);
+    return cached;
+  } catch (error) {
+    console.error('Haber önbelleği okunamadı:', error);
+    return [];
   }
-};
-
-export const getNewsCache = async () => {
-  await migrateLocalStorageToIndexedDB();
-  
-  return new Promise(async (resolve, reject) => {
-    try {
-      const db = await getDB();
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
-
-      request.onsuccess = () => {
-        let cached = request.result || [];
-        
-        cached = cached.map(item => {
-          if (typeof item.date === 'string') {
-            item.date = new Date(item.date);
-          }
-          
-          // GELECEK TARİH KORUMASI (Cache'de kalmış hatalı veriler için self-healing)
-          const now = new Date();
-          if (item.date > now) {
-            item.date = now;
-          }
-          
-          // AUTO-FIX: Relative linkleri onar
-          if (item.link && item.link.startsWith('/') && !item.link.startsWith('//') && item.sourceUrl) {
-            try {
-              const rootUrl = new URL(item.sourceUrl);
-              item.link = `${rootUrl.protocol}//${rootUrl.hostname}${item.link}`;
-            } catch (e) {}
-          }
-          return item;
-        });
-
-        // Tarihe göre sırala
-        cached.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        resolve(cached);
-      };
-      request.onerror = () => reject(request.error);
-    } catch (e) {
-      console.error('Haber önbelleği IndexedDB den okunamadı:', e);
-      resolve([]);
-    }
-  });
 };
 
 /**
- * Yeni çekilen canlı feed'leri alır ve filtreleyip IndexedDB'ye bulk olarak kaydeder.
- * 
- * SPAM TESPİTİ: Bir RSS kaynağı tek seferde (20 saniyelik bir fetch burst'ünde)
- * 10'dan fazla haber gönderiyorsa, o kaynaktan gelen TÜM haberler isSpam:true olarak işaretlenir.
- * Diğer kaynakların haberleri etkilenmez.
+ * Yeni çekilen canlı feed'leri alır, eskileri ve tekrarları atarak LocalStorage'a kaydeder.
+ * Bu fonksiyon "Otomatik Temizlik (Garbage Collection)" içerir.
  */
-export const saveNewsItems = async (newItems) => {
-  const cutoffTime = Date.now() - (CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  
-  const freshItems = newItems.filter(item => {
-    const t = item.date?.getTime?.() || Date.now();
-    return t > cutoffTime;
+export const saveNewsItems = (newItems) => {
+  let cached = getNewsCache();
+
+  // 1. ÇÖP TOPLAYICI (Garbage Collection): 3 Günden eski cache'leri hukuken ve depolama için at.
+  const cutoffTime = new Date().getTime() - (CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  cached = cached.filter(item => {
+    const itemTime = item.date.getTime();
+    return itemTime > cutoffTime;
   });
-  
-  if (freshItems.length === 0) return [];
 
-  // SPAM TESPİTİ: Aynı Zaman (Timestamp) Analizi
-  // Bir kaynakta tam olarak AYNI SAAT/SANİYE ile 5'ten fazla haber gelmişse bunlar spamdır.
-  const itemsBySource = new Map();
-  for (const item of freshItems) {
-    const src = item.sourceUrl || '';
-    if (!itemsBySource.has(src)) itemsBySource.set(src, []);
-    itemsBySource.get(src).push(item);
-  }
+  // 2. Mükemmel Tekilleştirme Cihazı (Hızlı arama için Set/Map kullanımı)
+  const cacheMap = new Map();
+  cached.forEach(i => {
+    const rawLink = i.link && i.link !== '#' ? i.link.split('?')[0] : '';
+    cacheMap.set(i.title.trim().toLowerCase() + "||" + rawLink, true);
+  });
 
-  const taggedItems = [];
-  for (const [src, sourceItems] of itemsBySource.entries()) {
-    // Tüm gelen haberler içinden (newItems içinden) bu kaynak için saatleri kontrol et
-    const fullSourceItems = newItems.filter(i => i.sourceUrl === src);
-    const timeCounts = new Map();
-    
-    for (const item of fullSourceItems) {
-      if (!item.date) continue;
-      // Milisaniye yerine SANİYE bazında grupla (Precision Fix)
-      const ts = Math.floor(item.date.getTime() / 1000); 
-      timeCounts.set(ts, (timeCounts.get(ts) || 0) + 1);
-    }
+  // 3. Yeni gelenler arasından sadece "daha önce eklenmemiş" olanları filtrele
+  const itemsToAdd = newItems.filter(item => {
+    let time = item.date.getTime();
+    if (isNaN(time)) time = new Date().getTime(); // Bozuk tarih koruması
 
-    // Hangi zaman damgaları (saniyeler) spam?
-    const spammySeconds = new Set();
-    for (const [sec, count] of timeCounts.entries()) {
-      if (count > 5) {
-        spammySeconds.add(sec);
+    // Çok eski bir haberi hiç veritabanına sokma
+    if (time <= cutoffTime) return false;
+
+    const rawLink = item.link && item.link !== '#' ? item.link.split('?')[0] : '';
+    const uniqueKey = item.title.trim().toLowerCase() + "||" + rawLink;
+
+    if (cacheMap.has(uniqueKey)) return false;
+
+    cacheMap.set(uniqueKey, true);
+    return true;
+  });
+
+  // 4. Yeni taze haberleri en üste (başa) ekle
+  cached = [...itemsToAdd, ...cached];
+
+  // 5. Kaydet (Audit: LocalStorage Limit Koruması - 5MB - V12.2)
+  try {
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
+  } catch (e) {
+    // Hafıza dolunca (5MB sınırı) en eski haberleri buda (Pruning)
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      console.warn("LocalStorage Dolu! Akıllı temizlik (Pruning) yapılıyor...");
+      // Listenin en başındakiler (yeni) kalsın, sonundakileri (%30) at.
+      const pruned = cached.slice(0, Math.floor(cached.length * 0.7));
+      try {
+        localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(pruned));
+        cached = pruned;
+      } catch (innerErr) {
+        // Hala doluvsa daha agresif temizle (Sadece 200 haber kalsın)
+        const ultraPruned = cached.slice(0, 200);
+        localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(ultraPruned));
+        cached = ultraPruned;
       }
     }
-
-    for (const item of sourceItems) {
-      const itemSec = item.date ? Math.floor(item.date.getTime() / 1000) : 0;
-      taggedItems.push({
-        ...item,
-        isSpam: spammySeconds.has(itemSec)
-      });
-    }
   }
 
-  const db = await getDB();
-  const tx = db.transaction(STORE_NAME, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
-  
-  for (const item of taggedItems) {
-    store.put(item);
-  }
-  
-  return new Promise(resolve => {
-    tx.oncomplete = () => resolve(taggedItems);
-    tx.onerror = () => resolve([]);
-  });
+  return cached; // Tekrar UI'a güncel (veya budanmış) halini ver
 };
 
 // ==========================================
@@ -341,69 +207,35 @@ export const saveFilters = (filters) => {
 
 // ==========================================
 // YAPAY ZEKA (AI) AYARLARI (GROQ)
-// Güvenli Depolama Katmanı:
-//   - Electron: window.electronAPI.getApiKey / saveApiKey (node keytar)
-//   - Android / iOS: @capacitor/preferences → EncryptedSharedPreferences / Keychain
-//   - Web fallback: localStorage (geliştirme amaçlı)
 // ==========================================
-
-const GROQ_PREFS_KEY = 'groq_api_key';
-
 export const getGroqApiKey = async () => {
-  // 1) Electron — şifreli native keystore
+  // Audit: Encryption support for API Keys
   if (window.electronAPI && typeof window.electronAPI.getApiKey === 'function') {
     try {
       const secureKey = await window.electronAPI.getApiKey();
       if (secureKey) return secureKey;
     } catch (err) {
-      console.error('Electron secure key retrieval failed:', err);
+      console.error("Secure key retrieval failed:", err);
     }
   }
-
-  // 2) Android / iOS — Capacitor Preferences (EncryptedSharedPreferences / Keychain)
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { value } = await Preferences.get({ key: GROQ_PREFS_KEY });
-      return value || '';
-    } catch (err) {
-      console.error('Capacitor Preferences get failed:', err);
-    }
-  }
-
-  // 3) Web geliştirme ortamı — localStorage
   return localStorage.getItem('rss_groq_api_key') || '';
 };
 
 export const saveGroqApiKey = async (key) => {
   const cleanKey = key?.trim() || '';
 
-  // 1) Electron — şifreli native keystore
+  // Audit: Encrypt key in Electron environment
   if (window.electronAPI && typeof window.electronAPI.saveApiKey === 'function') {
     try {
       await window.electronAPI.saveApiKey(cleanKey);
-      localStorage.removeItem('rss_groq_api_key'); // Eski plain-text temizle
+      // Clean up localStorage if it existed
+      localStorage.removeItem('rss_groq_api_key');
       return;
     } catch (err) {
-      console.error('Electron secure key save failed:', err);
+      console.error("Secure key save failed:", err);
     }
   }
 
-  // 2) Android / iOS — Capacitor Preferences
-  if (Capacitor.isNativePlatform()) {
-    try {
-      if (cleanKey) {
-        await Preferences.set({ key: GROQ_PREFS_KEY, value: cleanKey });
-      } else {
-        await Preferences.remove({ key: GROQ_PREFS_KEY });
-      }
-      localStorage.removeItem('rss_groq_api_key'); // Varsa eski plain-text temizle
-      return;
-    } catch (err) {
-      console.error('Capacitor Preferences set failed:', err);
-    }
-  }
-
-  // 3) Web fallback
   if (cleanKey) {
     localStorage.setItem('rss_groq_api_key', cleanKey);
   } else {
@@ -417,27 +249,13 @@ export const saveGroqApiKey = async (key) => {
 export const getAppSettings = () => {
   try {
     const data = localStorage.getItem('rss_app_settings');
-    return data ? JSON.parse(data) : { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0, blockSpam: true };
+    return data ? JSON.parse(data) : { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0 };
   } catch {
-    return { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0, blockSpam: true };
+    return { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0 };
   }
 };
 
 export const saveAppSettings = (settings) => {
   localStorage.setItem('rss_app_settings', JSON.stringify(settings));
-};
-
-// --- GÖRÜNÜM BAZLI AYARLAR (Spam Engelleme vb.) ---
-export const getViewSettings = () => {
-  try {
-    const data = localStorage.getItem('rss_view_settings');
-    return data ? JSON.parse(data) : {};
-  } catch {
-    return {};
-  }
-};
-
-export const saveViewSettings = (settings) => {
-  localStorage.setItem('rss_view_settings', JSON.stringify(settings));
 };
 
