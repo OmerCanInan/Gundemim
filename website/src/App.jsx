@@ -1,7 +1,4 @@
-import React from 'react';
-import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText } from 'lucide-react';
-import laptopMockup from './assets/hero-laptop.png';
-import radioMockup from './assets/radio-mobile.png';
+import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText, Monitor, CheckCircle, Smartphone } from 'lucide-react';
 
 function App() {
   const latestReleaseUrl = "https://github.com/OmerCanInan/Gundemim/releases/latest";
@@ -19,27 +16,53 @@ function App() {
           kişisel radyo moduna sahip yeni nesil bir haber okuyucudur.
         </p>
         
-        <div className="fade-in" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', animationDelay: '0.3s' }}>
-          <a href={latestReleaseUrl} className="btn btn-primary">
-            <Download size={18} /> Windows (Masaüstü)
-          </a>
-          <a href={latestReleaseUrl} className="btn btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
-            <Globe size={18} /> Android (APK)
-          </a>
-          <a href="#ozellikler" className="btn btn-outline">
-            Tüm Özellikler
-          </a>
+        <div className="fade-in" style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+          gap: '1.5rem', 
+          width: '100%', 
+          maxWidth: '900px',
+          marginTop: '4rem',
+          animationDelay: '0.3s' 
+        }}>
+          {/* Windows Download Card */}
+          <div className="download-card glass">
+            <div className="card-platform">
+              <Monitor size={32} />
+              <div>
+                <h4>Windows Sürümü</h4>
+                <p>Masaüstü için taşınabilir (Portable) .exe</p>
+              </div>
+            </div>
+            <a href={latestReleaseUrl} className="btn btn-primary w-full">
+              <Download size={18} /> .EXE İndir
+            </a>
+          </div>
+
+          {/* Android Download Card */}
+          <div className="download-card glass">
+            <div className="card-platform">
+              <Smartphone size={32} />
+              <div>
+                <h4>Android Sürümü</h4>
+                <p>Mobil için yüklenebilir .apk dosyası</p>
+              </div>
+            </div>
+            <a href={latestReleaseUrl} className="btn btn-outline w-full" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+              <Globe size={18} /> .APK İndir
+            </a>
+          </div>
         </div>
 
-        <div className="trust-badges fade-in" style={{ animationDelay: '0.4s' }}>
+        <div className="trust-badges fade-in" style={{ animationDelay: '0.5s', marginTop: '3rem' }}>
           <div className="trust-badge">
-            <Zap size={14} /> Açık Kaynak
+            <CheckCircle size={14} /> Açık Kaynak
           </div>
           <div className="trust-badge">
             <Shield size={14} /> %100 Güvenli
           </div>
           <div className="trust-badge">
-            <Monitor size={14} /> Masaüstü & Mobil
+            <Bot size={14} /> AI Destekli
           </div>
         </div>
       </header>
