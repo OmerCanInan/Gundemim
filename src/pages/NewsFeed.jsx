@@ -1,6 +1,6 @@
 // src/pages/NewsFeed.jsx
 // RSS Haberlerinin (Sonuçların) listelendiği Ana Ekran.
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, startTransition } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { fetchRssFeed, generateTags } from '../services/rssService';
 import { getRssLinks, getNewsCache, saveNewsItems, getFilters, saveFilters, getAppSettings } from '../services/dbService';
@@ -150,7 +150,7 @@ export default function NewsFeed() {
 
     const loadNews = async () => {
       // 1. ANINDA YÜKLEME (Cache) 
-      const initialData = getNewsCache();
+      const initialData = await getNewsCache();
       const currentLinks = getRssLinks();
       
       const filterByContext = (data) => {
@@ -254,10 +254,10 @@ export default function NewsFeed() {
             if (isCancelled || requestId !== latestRequestIdRef.current) break;
             
             // Burst Protection Hack: Tiny delay before starting new promise
-            await new Promise(r => setTimeout(r, 50));
+            await new Promise(r => setTimeout(r, 5));
 
             const promise = fetchRssFeed(linkObj.url, controller.signal, timeout)
-              .then(items => {
+              .then(async items => {
                 if (!isCancelled && requestId === latestRequestIdRef.current) {
                    setRefreshStat(prev => ({ ...prev, done: prev.done + 1 }));
                    
@@ -269,10 +269,12 @@ export default function NewsFeed() {
                    }));
 
                     if (items && items.length > 0) {
-                      saveNewsItems(items);
-                      const allNews = getNewsCache();
-                      setNews(sortNews(filterByContext(allNews)));
-                      setLoading(false);
+                      await saveNewsItems(items);
+                      const allNews = await getNewsCache();
+                      startTransition(() => {
+                        setNews(sortNews(filterByContext(allNews)));
+                        setLoading(false);
+                      });
                     }
                 }
                 return { status: 'fulfilled', url: linkObj.url };
@@ -321,9 +323,9 @@ export default function NewsFeed() {
           setLoading(false);
         }
 
-        // PASS 2: Derin Tarama (Arka Plan - 60 saniye limit)
+        // PASS 2: Derin Tarama (Arka Plan - 20 saniye limit)
         if (failedInPass1.length > 0 && !isCancelled && requestId === latestRequestIdRef.current) {
-           await runTasks(failedInPass1, 2, 60000);
+           await runTasks(failedInPass1, 4, 20000);
         }
 
       } catch (err) {

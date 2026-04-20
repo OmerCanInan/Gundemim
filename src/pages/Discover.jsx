@@ -64,12 +64,6 @@ const DISCOVER_FEEDS = [
   { folder: "Spor", feeds: [
     { name: "Ajansspor", url: "https://ajansspor.com/rss" },
     { name: "Mackolik", url: "https://www.mackolik.com/rss" }
-  ]},
-  { folder: "Otomobil", feeds: [
-    { name: "DonanımHaber Oto", url: "https://www.donanimhaber.com/rss/otomobil" },
-    { name: "Motor1 Türkiye", url: "https://tr.motor1.com/rss/all/all/" },
-    { name: "Otoshow", url: "https://www.otoshow.com.tr/feed/" },
-    { name: "Log Otomobil", url: "https://www.log.com.tr/kategori/otomobil/feed/" }
   ]}
 ];
 
@@ -165,19 +159,6 @@ const READY_PACKAGES = [
       { name: "Science Daily", url: "https://www.sciencedaily.com/rss/all.xml" },
       { name: "Space.com", url: "https://www.space.com/feeds/all" },
       { name: "National Geographic", url: "https://www.nationalgeographic.com/rss/index.xml" }
-    ]
-  },
-  {
-    name: "Otomobil Dünyası",
-    emoji: "🏎️",
-    description: "Test sürüşleri ve yeni modeller",
-    color: "#b91c1c",
-    folder: "Otomobil",
-    feeds: [
-      { name: "DonanımHaber Oto", url: "https://www.donanimhaber.com/rss/otomobil" },
-      { name: "Motor1 Türkiye", url: "https://tr.motor1.com/rss/all/all/" },
-      { name: "Log Otomobil", url: "https://www.log.com.tr/kategori/otomobil/feed/" },
-      { name: "Otoshow", url: "https://www.otoshow.com.tr/feed/" }
     ]
   },
   {

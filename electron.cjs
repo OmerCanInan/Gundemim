@@ -102,14 +102,6 @@ ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 20000) => {
   const cleanUrl = url.trim();
   
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8',
-    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache',
-    'Referer': 'https://www.google.com/',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
     'Sec-Fetch-Site': 'cross-site',
     'Upgrade-Insecure-Requests': '1'
   };
@@ -149,7 +141,7 @@ ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 20000) => {
   }
 });
 
-app.userAgentFallback = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
+app.userAgentFallback = "Gundemim/1.1 (RSS Reader; +https://github.com/OmerCanInan/Gundemim)";
 
 // Audit: Centralized session management (Avoid duplicate listeners)
 app.on('web-contents-created', (event, contents) => {

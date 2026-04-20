@@ -351,7 +351,7 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
         const capResponse = await CapacitorHttp.get({
           url: cleanUrl,
           headers: {
-            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            'User-Agent': "Gundemim/1.1 (RSS Reader; +https://github.com/OmerCanInan/Gundemim)",
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           },
@@ -371,28 +371,33 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
     if (!xmlText) {
       // --- NORMAL FETCH (Mobil Fallback / Web) ---
       const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-      const response = await fetch(cleanUrl, { 
+      const fetchOptions = {
         signal: activeSignal,
         cache: 'default',
         headers: {
           'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Gundemim/1.1 (RSS Reader; +https://github.com/OmerCanInan/Gundemim)',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
-      });
-      
-      if (!response.ok) {
-          let errorMsg = `Sunucu Hatası (${response.status})`;
-          if (response.status === 403 || response.status === 401) {
-              errorMsg = "Bu siteye erişim engellendi (403/401).";
-          } else if (response.status === 404) {
-              errorMsg = "RSS linki bulunamadı (404).";
-          }
-          throw new Error(errorMsg);
+      };
+
+      try {
+        const response = await fetch(cleanUrl, fetchOptions);
+        if (!response.ok) {
+          throw new Error(`Sunucu Hatası (${response.status})`);
+        }
+        xmlText = await response.text();
+      } catch (err) {
+        console.warn(`Direct fetch failed for ${cleanUrl}, trying CORS proxy...`, err);
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(cleanUrl)}`;
+        const proxyResponse = await fetch(proxyUrl, fetchOptions);
+        
+        if (!proxyResponse.ok) {
+          throw new Error(`CORS Proxy Hatası (${proxyResponse.status})`);
+        }
+        xmlText = await proxyResponse.text();
       }
-      
-      xmlText = await response.text();
     }
     
     clearTimeout(id);
@@ -458,7 +463,13 @@ export const fetchRssFeed = async (url, signal = null, timeoutMs = 10000) => {
       // Tarih Parsing (RSS: pubDate, Atom: published/updated)
       let pubDateStr = item.querySelector('pubDate')?.textContent || item.querySelector('published')?.textContent || item.querySelector('updated')?.textContent || new Date().toISOString();
       
-      const localDate = new Date(pubDateStr); // Otomatik olarak sistem local saatine (Örn: +3) dönüştürülür.
+      let localDate = new Date(pubDateStr); // Otomatik olarak sistem local saatine (Örn: +3) dönüştürülür.
+
+      // GELECEK TARİH KORUMASI: Eğer haber gelecekten geliyorsa (timezone hatası vb.), şimdiki zamanı ata.
+      const now = new Date();
+      if (localDate > now) {
+        localDate = now;
+      }
 
       // Görsel çekimi (Kapsamlı RSS Image Scraper)
       let imageUrl = null;

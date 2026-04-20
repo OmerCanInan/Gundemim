@@ -143,46 +143,113 @@ export const deleteFolder = (folderName) => {
 };
 
 // ==========================================
-// HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI
+// HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI (IndexedDB)
 // ==========================================
 
-export const getNewsCache = () => {
+const IDB_NAME = 'GundemimDB';
+const IDB_VERSION = 1;
+const STORE_NAME = 'news_cache';
+
+const getDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+  });
+};
+
+export const migrateLocalStorageToIndexedDB = async () => {
   try {
     const data = localStorage.getItem(NEWS_CACHE_KEY);
-    let cached = data ? JSON.parse(data) : [];
-    let hasDirtyLinks = false;
+    if (!data) return;
+    const cached = JSON.parse(data);
+    if (!Array.isArray(cached) || cached.length === 0) return;
+
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
     
-    // Tarih string'lerini anında JS Date objelerine dönüştür
-    cached = cached.map(item => {
-      item.date = new Date(item.date);
+    // Clear old store first
+    store.clear();
 
-      // AUTO-FIX: Relative linkleri onar (Örn: Bigpara'dan gelen /haber/...)
-      if (item.link && item.link.startsWith('/') && !item.link.startsWith('//') && item.sourceUrl) {
-        try {
-          const rootUrl = new URL(item.sourceUrl);
-          item.link = `${rootUrl.protocol}//${rootUrl.hostname}${item.link}`;
-          hasDirtyLinks = true;
-        } catch (e) {}
+    for (const item of cached) {
+      if (typeof item.date === 'string') {
+        item.date = new Date(item.date);
       }
-      return item;
-    });
-
-    if (hasDirtyLinks) {
-       localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
+      store.put(item);
     }
-    return cached;
-  } catch (error) {
-    console.error('Haber önbelleği okunamadı:', error);
-    return [];
+
+    return new Promise((resolve) => {
+      tx.oncomplete = () => {
+        localStorage.removeItem(NEWS_CACHE_KEY);
+        console.log("Migrated localStorage to IndexedDB successfully.");
+        resolve();
+      };
+    });
+  } catch (err) {
+    console.error("Migration failed:", err);
   }
 };
 
+export const getNewsCache = async () => {
+  await migrateLocalStorageToIndexedDB();
+  
+  return new Promise(async (resolve, reject) => {
+    try {
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        let cached = request.result || [];
+        
+        cached = cached.map(item => {
+          if (typeof item.date === 'string') {
+            item.date = new Date(item.date);
+          }
+          
+          // GELECEK TARİH KORUMASI (Cache'de kalmış hatalı veriler için self-healing)
+          const now = new Date();
+          if (item.date > now) {
+            item.date = now;
+          }
+          
+          // AUTO-FIX: Relative linkleri onar
+          if (item.link && item.link.startsWith('/') && !item.link.startsWith('//') && item.sourceUrl) {
+            try {
+              const rootUrl = new URL(item.sourceUrl);
+              item.link = `${rootUrl.protocol}//${rootUrl.hostname}${item.link}`;
+            } catch (e) {}
+          }
+          return item;
+        });
+
+        // Tarihe göre sırala
+        cached.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        resolve(cached);
+      };
+      request.onerror = () => reject(request.error);
+    } catch (e) {
+      console.error('Haber önbelleği IndexedDB den okunamadı:', e);
+      resolve([]);
+    }
+  });
+};
+
 /**
- * Yeni çekilen canlı feed'leri alır, eskileri ve tekrarları atarak LocalStorage'a kaydeder.
+ * Yeni çekilen canlı feed'leri alır, eskileri ve tekrarları atarak IndexedDB'ye kaydeder.
  * Bu fonksiyon "Otomatik Temizlik (Garbage Collection)" içerir.
  */
-export const saveNewsItems = (newItems) => {
-  let cached = getNewsCache();
+export const saveNewsItems = async (newItems) => {
+  let cached = await getNewsCache();
   
   // 1. ÇÖP TOPLAYICI (Garbage Collection): 7 Günden eski cache'leri hukuken ve depolama için at.
   const cutoffTime = new Date().getTime() - (CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
@@ -218,28 +285,30 @@ export const saveNewsItems = (newItems) => {
   // 4. Yeni taze haberleri en üste (başa) ekle
   cached = [...itemsToAdd, ...cached];
 
-  // 5. Kaydet (Audit: LocalStorage Limit Koruması - 5MB - V12.2)
-  try {
-    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cached));
-  } catch (e) {
-    // Hafıza dolunca (5MB sınırı) en eski haberleri buda (Pruning)
-    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-      console.warn("LocalStorage Dolu! Akıllı temizlik (Pruning) yapılıyor...");
-      // Listenin en başındakiler (yeni) kalsın, sonundakileri (%30) at.
-      const pruned = cached.slice(0, Math.floor(cached.length * 0.7));
-      try {
-        localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(pruned));
-        cached = pruned;
-      } catch (innerErr) {
-        // Hala doluvsa daha agresif temizle (Sadece 200 haber kalsın)
-        const ultraPruned = cached.slice(0, 200);
-        localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(ultraPruned));
-        cached = ultraPruned;
-      }
-    }
+  // Opsiyonel Limit
+  if (cached.length > 5000) {
+    cached = cached.slice(0, 5000);
   }
-  
-  return cached; // Tekrar UI'a güncel (veya budanmış) halini ver
+
+  // 5. Kaydet (IndexedDB)
+  try {
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    
+    store.clear();
+    for (const item of cached) {
+      store.put(item);
+    }
+
+    return new Promise((resolve) => {
+      tx.oncomplete = () => resolve(cached);
+      tx.onerror = () => resolve(cached);
+    });
+  } catch (e) {
+    console.warn("IndexedDB Kayıt Başarısız", e);
+    return cached;
+  }
 };
 
 // ==========================================
