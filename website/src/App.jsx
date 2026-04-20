@@ -8,29 +8,6 @@ function App() {
 
   return (
     <div className="landing">
-      {/* Navbar */}
-      <nav className="nav-bar glass fade-in">
-        <div className="nav-content">
-          <div className="nav-logo">
-            <div className="logo-icon">
-              <FileText size={18} />
-            </div>
-            <span>Gündemim</span>
-            <div className="version-badge">v1.0.2</div>
-          </div>
-          
-          <div className="nav-links">
-            <a href="#ozellikler" className="nav-link">Özellikler</a>
-            <a href="https://github.com/OmerCanInan/Gundemim" target="_blank" rel="noreferrer" className="nav-github">
-              <Github size={20} />
-            </a>
-            <a href={latestReleaseUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-              <Download size={16} /> Hemen İndir
-            </a>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <header className="hero container">
         <p className="hero-tagline fade-in">Yapay Zeka Destekli Haber Deneyimi</p>
