@@ -7,6 +7,6 @@ export default defineConfig({
   base: './', // GitHub Pages için göreceli path
   build: {
     outDir: '../docs', // Ana dizindeki docs klasörüne çıktı ver
-    emptyOutDir: true
+    emptyOutDir: false
   }
 })
