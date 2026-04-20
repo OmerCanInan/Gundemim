@@ -1,6 +1,4 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { getAppSettings } from '../services/dbService';
-import { translateTextToTurkish } from '../services/translationService';
 
 const RadioContext = createContext();
 
@@ -155,11 +153,48 @@ export const RadioProvider = ({ children }) => {
 
     let finalTitle = item.title;
     try {
-      // Use the unified translation service which handles platform branching (Desktop vs Mobile)
-      const translatedText = await translateTextToTurkish(finalTitle);
-      if (translatedText) finalTitle = translatedText;
+      if (window.electronAPI && typeof window.electronAPI.translateText === 'function') {
+        // --- DESKTOP (Electron) - Use Safe IPC Bridge ---
+        const translatedText = await window.electronAPI.translateText(finalTitle, 'tr');
+        if (translatedText) finalTitle = translatedText;
+      } else {
+        // --- MOBILE / WEB (LibreTranslate - Play Store Safe) ---
+        const endpoints = [
+          'https://libretranslate.de/translate',
+          'https://translate.argosopentech.com/translate',
+          'https://translate.terraprint.co/translate',
+          'https://libretranslate.pussthecat.org/translate'
+        ];
+        
+        const body = JSON.stringify({
+          q: finalTitle,
+          source: 'auto',
+          target: 'tr',
+          format: 'text'
+        });
+
+        let translated = null;
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(ep, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body,
+              signal: AbortSignal.timeout(6000)
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.translatedText) {
+                translated = data.translatedText;
+                break;
+              }
+            }
+          } catch (e) { continue; }
+        }
+        if (translated) finalTitle = translated;
+      }
     } catch (err) {
-      console.warn("Radyo çeviri hatası", err);
+      console.warn("Radyo çeviri hatası:", err);
     }
 
     if (!isPlayingRef.current) return;
