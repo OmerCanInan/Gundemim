@@ -689,7 +689,7 @@ export default function NewsFeed() {
           </div>
         </div>
       )}
-      <div className="feed-header fade-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="feed-header fade-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
         <div>
           <Link to="/" className="btn-back">
             <ArrowLeft size={18} /> Geri Dön
@@ -740,7 +740,8 @@ export default function NewsFeed() {
               background: 'rgba(16, 185, 129, 0.1)',
               color: '#10b981', 
               border: '1px solid rgba(16, 185, 129, 0.4)', 
-              cursor: 'pointer', transition: 'all 0.3s ease', fontWeight: '600', fontSize: '0.9rem', zIndex: 5
+              cursor: 'pointer', transition: 'all 0.3s ease', fontWeight: '600', fontSize: '0.9rem', zIndex: 5,
+              height: '42px'
             }}
           >
             <Bot size={18} />
@@ -755,7 +756,8 @@ export default function NewsFeed() {
               color: isPlayingRadio ? '#ff8a8a' : 'var(--text-color)', 
               border: isPlayingRadio ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)', 
               boxShadow: isPlayingRadio ? '0 0 12px rgba(239, 68, 68, 0.15)' : 'none',
-              cursor: 'pointer', transition: 'all 0.3s ease', fontWeight: '600', fontSize: '0.9rem', zIndex: 5
+              cursor: 'pointer', transition: 'all 0.3s ease', fontWeight: '600', fontSize: '0.9rem', zIndex: 5,
+              height: '42px'
             }}
           >
             {isPlayingRadio ? <Square size={16} fill="currentColor" /> : <Headphones size={18} />}
@@ -764,7 +766,7 @@ export default function NewsFeed() {
 
           {/* Spam Engelleme Toggle (V9) */}
           {activeViewId !== 'spam' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <div style={{ 
                 display: 'flex', alignItems: 'center', gap: 0,
                 borderRadius: '8px', overflow: 'hidden',
@@ -774,10 +776,10 @@ export default function NewsFeed() {
                 <button
                   onClick={() => !blockSpam && handleToggleSpam()}
                   style={{
-                    padding: '0.6rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700',
+                    padding: '0.4rem 0.9rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700',
                     background: blockSpam ? 'var(--danger-color)' : 'var(--bg-secondary)',
                     color: blockSpam ? '#fff' : 'var(--text-light)',
-                    border: 'none', transition: 'all 0.2s'
+                    border: 'none', transition: 'all 0.2s', height: '38px'
                   }}
                 >
                   Spam'ı Engelle
@@ -785,17 +787,21 @@ export default function NewsFeed() {
                 <button
                   onClick={() => blockSpam && handleToggleSpam()}
                   style={{
-                    padding: '0.6rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700',
+                    padding: '0.4rem 0.9rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700',
                     background: !blockSpam ? 'var(--success-color)' : 'var(--bg-secondary)',
                     color: !blockSpam ? '#fff' : 'var(--text-light)',
-                    border: 'none', transition: 'all 0.2s'
+                    border: 'none', transition: 'all 0.2s', height: '38px'
                   }}
                 >
                   Spam'a İzin Ver
                 </button>
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-light)', opacity: 0.7, maxWidth: '180px', lineHeight: '1.2' }}>
-                * Spam engellenirse aynı saatte toplu yapan kaynaklar engellenir.
+              <div style={{ 
+                position: 'absolute', bottom: '-1.1rem', left: 0,
+                fontSize: '0.62rem', color: 'var(--text-light)', opacity: 0.6, 
+                whiteSpace: 'nowrap', lineHeight: '1.2' 
+              }}>
+                * Aynı saatte toplu yapan kaynaklar engellenir.
               </div>
             </div>
           )}
@@ -806,13 +812,14 @@ export default function NewsFeed() {
               display: 'flex', alignItems: 'center', gap: 0,
               borderRadius: '8px', overflow: 'hidden',
               border: '1px solid var(--border-color)',
+              height: '42px'
             }}>
               <button
                 onClick={() => setRadioVoiceGender('female')}
                 title="Kadın Sesi"
                 style={{
-                  padding: '0.5rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem',
-                  border: 'none', transition: 'all 0.2s',
+                  padding: '0.3rem 0.8rem', cursor: 'pointer', fontSize: '0.85rem',
+                  border: 'none', transition: 'all 0.2s', height: '100%',
                   background: radioVoiceGender === 'female' ? 'rgba(236,72,153,0.15)' : 'var(--bg-secondary)',
                   color: radioVoiceGender === 'female' ? '#f9a8d4' : 'var(--text-light)',
                   borderRight: '1px solid var(--border-color)',
@@ -824,8 +831,8 @@ export default function NewsFeed() {
                 onClick={() => setRadioVoiceGender('male')}
                 title="Erkek Sesi (Beta)"
                 style={{
-                  padding: '0.5rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem',
-                  border: 'none', transition: 'all 0.2s',
+                  padding: '0.3rem 0.8rem', cursor: 'pointer', fontSize: '0.85rem',
+                  border: 'none', transition: 'all 0.2s', height: '100%',
                   background: radioVoiceGender === 'male' ? 'rgba(59,130,246,0.15)' : 'var(--bg-secondary)',
                   color: radioVoiceGender === 'male' ? '#93c5fd' : 'var(--text-light)',
                 }}
