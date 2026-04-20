@@ -9,24 +9,26 @@ function App() {
   return (
     <div className="landing">
       {/* Navbar */}
-      <nav className="container glass" style={{ 
-        position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
-        width: '90%', borderRadius: '99px', padding: '0.8rem 2rem', 
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100 
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '1.2rem' }}>
-          <div style={{ background: 'var(--primary)', color: '#000', padding: '4px', borderRadius: '6px' }}>
-            <FileText size={20} />
+      <nav className="nav-bar glass fade-in">
+        <div className="nav-content">
+          <div className="nav-logo">
+            <div className="logo-icon">
+              <FileText size={18} />
+            </div>
+            <span>Gündemim</span>
+            <div className="version-badge">v1.0.2</div>
           </div>
-          Gündemim
+          
+          <div className="nav-links">
+            <a href="#ozellikler" className="nav-link">Özellikler</a>
+            <a href="https://github.com/OmerCanInan/Gundemim" target="_blank" rel="noreferrer" className="nav-github">
+              <Github size={20} />
+            </a>
+            <a href={latestReleaseUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
+              <Download size={16} /> Hemen İndir
+            </a>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '2rem', fontSize: '0.9rem', fontWeight: 600 }}>
-          <a href="#ozellikler" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Özellikler</a>
-          <a href={latestReleaseUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>İndir</a>
-        </div>
-        <a href="https://github.com/OmerCanInan/Gundemim" target="_blank" rel="noreferrer" style={{ color: 'var(--text-main)' }}>
-          <Github size={20} />
-        </a>
       </nav>
 
       {/* Hero Section */}
@@ -47,6 +49,18 @@ function App() {
           <a href="#ozellikler" className="btn btn-outline">
             Daha Fazla Bilgi
           </a>
+        </div>
+
+        <div className="trust-badges fade-in" style={{ animationDelay: '0.4s' }}>
+          <div className="trust-badge">
+            <Zap size={14} /> Açık Kaynak
+          </div>
+          <div className="trust-badge">
+            <Shield size={14} /> %100 Güvenli
+          </div>
+          <div className="trust-badge">
+            <Globe size={14} /> Masaüstü & Mobil
+          </div>
         </div>
 
         <div className="mockup-container fade-in" style={{ animationDelay: '0.4s' }}>
