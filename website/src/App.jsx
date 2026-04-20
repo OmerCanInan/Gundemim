@@ -1,5 +1,4 @@
 import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText, Monitor, CheckCircle, Smartphone } from 'lucide-react';
-import logo from './assets/logo.png';
 
 function App() {
   const latestReleaseUrl = "https://github.com/OmerCanInan/Gundemim/releases/latest";
@@ -8,9 +7,6 @@ function App() {
     <div className="landing">
       {/* Hero Section */}
       <header className="hero container">
-        <div className="fade-in" style={{ marginBottom: '2rem' }}>
-          <img src={logo} alt="Gündemim Logo" style={{ width: '80px', height: '80px', borderRadius: '16px' }} />
-        </div>
         <p className="hero-tagline fade-in">TÜM HABERLER TEK NOKTADA</p>
         <h1 className="hero-title fade-in" style={{ animationDelay: '0.1s' }}>
           Gündeminizi <span>Tek Bir Yerden</span> Yönetin.
