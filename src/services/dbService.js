@@ -103,6 +103,31 @@ export const deleteRssLink = (id) => {
   window.dispatchEvent(new Event('rss_db_updated')); // Global sinyal ver
 };
 
+/**
+ * Belirli bir klasörün adını günceller.
+ */
+export const updateFolderName = (oldName, newName) => {
+  const links = getRssLinks();
+  const updated = links.map(link => {
+    if (link.folder === oldName) {
+      return { ...link, folder: newName.trim() };
+    }
+    return link;
+  });
+  localStorage.setItem(DB_KEY, JSON.stringify(updated));
+  window.dispatchEvent(new Event('rss_db_updated'));
+};
+
+/**
+ * Belirli bir klasörü ve içindeki tüm linkleri siler.
+ */
+export const deleteFolder = (folderName) => {
+  let links = getRssLinks();
+  links = links.filter(link => link.folder !== folderName);
+  localStorage.setItem(DB_KEY, JSON.stringify(links));
+  window.dispatchEvent(new Event('rss_db_updated'));
+};
+
 // ==========================================
 // HABER BÖNBELLEĞİ (NEWS CACHING) & ÇEVRİMDIŞI
 // ==========================================
@@ -257,5 +282,21 @@ export const getAppSettings = () => {
 
 export const saveAppSettings = (settings) => {
   localStorage.setItem('rss_app_settings', JSON.stringify(settings));
+};
+
+// ==========================================
+// HABER AKIŞI GÖRÜNÜM AYARLARI (Persistent State)
+// ==========================================
+export const getViewSettings = () => {
+  try {
+    const data = localStorage.getItem('rss_view_settings');
+    return data ? JSON.parse(data) : { selectedFolder: '', searchQuery: '', sortBy: 'date' };
+  } catch {
+    return { selectedFolder: '', searchQuery: '', sortBy: 'date' };
+  }
+};
+
+export const saveViewSettings = (settings) => {
+  localStorage.setItem('rss_view_settings', JSON.stringify(settings));
 };
 
