@@ -1,34 +1,53 @@
 // src/services/translationService.js
-// Bu servis, ücretsiz bir çeviri API'si kullanarak metinleri Türkçe'ye çevirir.
-// Eğer ileride profesyonel bir Google/DeepL API'sine geçilmek istenirse sadece bu dosya değişecektir.
+// LibreTranslate tabanlı çeviri servisi — açık kaynak, KVKK uyumlu, ücretsiz.
+// Gayriresmi Google Translate API'sinden (translate.googleapis.com) göç edildi.
+// Hizmet veren public instance'lar: libretranslate.com, translate.argosopentech.com
+
+const LIBRE_ENDPOINTS = [
+  'https://libretranslate.com/translate',
+  'https://translate.argosopentech.com/translate',
+  'https://translate.fedilab.app/translate',
+];
 
 /**
- * Verilen metni otomatik olarak algılayıp Türkçe'ye çevirir.
+ * Verilen metni LibreTranslate kullanarak Türkçe'ye çevirir.
+ * Tüm public instance'lar denenilir, ilk başarılı cevap döner.
  * @param {string} text - Çevrilecek orijinal metin
- * @returns {Promise<string>} Çevrilmiş metin
+ * @returns {Promise<string>} Çevrilmiş metin (hata durumunda orijinal metin)
  */
 export const translateTextToTurkish = async (text) => {
   if (!text || text.trim() === '') return text;
 
-  try {
-    // Google Translate'in ücretsiz (gayriresmi) API uç noktasını kullanarak çeviri yapıyoruz.
-    // cliebt=gtx, sl=auto (orijinal dil algılanır), tl=tr (hedef dil Türkçe), dt=t (sadece çeviri metni döner)
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=tr&dt=t&q=${encodeURIComponent(text)}`;
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Çeviri hatası: ${response.status}`);
-    }
+  const body = JSON.stringify({
+    q: text,
+    source: 'auto',
+    target: 'tr',
+    format: 'text',
+    api_key: '', // Public instance'larda key gerekmez
+  });
 
-    const data = await response.json();
-    // Gelen data karmaşık bir dizi yapısındadır. Data[0] içinde çevrilmiş parçalar bulunur.
-    // Tüm parçaları birleştirerek tam metni elde ediyoruz.
-    const translatedText = data[0].map(item => item[0]).join('');
-    
-    return translatedText;
-  } catch (error) {
-    console.error('Çeviri işlemi başarısız oldu:', error);
-    // Hata olursa en azından orijinal metni göstererek uygulamanın çökmesini engelliyoruz.
-    return text;
+  for (const endpoint of LIBRE_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(8000), // 8 sn timeout
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      if (data?.translatedText) {
+        return data.translatedText;
+      }
+    } catch {
+      // Bu endpoint başarısız; sıradakini dene
+      continue;
+    }
   }
+
+  // Hiçbir instance yanıt vermediyse orijinal metni döndür
+  console.warn('LibreTranslate: Tüm instance\'lar yanıt vermedi, orijinal metin döndürülüyor.');
+  return text;
 };

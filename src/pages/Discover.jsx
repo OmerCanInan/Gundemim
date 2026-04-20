@@ -57,7 +57,6 @@ const DISCOVER_FEEDS = [
   { folder: "Kripto Para", feeds: [
     { name: "Koin Bülteni", url: "https://koinbulteni.com/feed" },
     { name: "BTCHaber", url: "https://www.btchaber.com/feed/" },
-    { name: "Kriptokoin", url: "https://kriptokoin.com/feed/" },
     { name: "CoinDesk", url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
     { name: "Cointelegraph", url: "https://cointelegraph.com/rss" }
   ]},
@@ -143,7 +142,6 @@ const READY_PACKAGES = [
     feeds: [
       { name: "Koin Bülteni", url: "https://koinbulteni.com/feed" },
       { name: "BTCHaber", url: "https://www.btchaber.com/feed/" },
-      { name: "Kriptokoin", url: "https://kriptokoin.com/feed/" },
       { name: "CoinDesk", url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
       { name: "Cointelegraph", url: "https://cointelegraph.com/rss" }
     ]
@@ -157,8 +155,7 @@ const READY_PACKAGES = [
     feeds: [
       { name: "NASA", url: "https://www.nasa.gov/feed/" },
       { name: "Science Daily", url: "https://www.sciencedaily.com/rss/all.xml" },
-      { name: "Space.com", url: "https://www.space.com/feeds/all" },
-      { name: "National Geographic", url: "https://www.nationalgeographic.com/rss/index.xml" }
+      { name: "Space.com", url: "https://www.space.com/feeds/all" }
     ]
   },
   {

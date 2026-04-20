@@ -1,6 +1,8 @@
 // src/services/dbService.js
 // Uygulamamızda veritabanı olarak şimdilik LocalStorage kullanıyoruz.
 // Clean Architecture prensiplerine uymak için veritabanı işlemlerini bu serviste soyutladık.
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 
 let _migrationDone = false;
 
@@ -295,35 +297,69 @@ export const saveFilters = (filters) => {
 
 // ==========================================
 // YAPAY ZEKA (AI) AYARLARI (GROQ)
+// Güvenli Depolama Katmanı:
+//   - Electron: window.electronAPI.getApiKey / saveApiKey (node keytar)
+//   - Android / iOS: @capacitor/preferences → EncryptedSharedPreferences / Keychain
+//   - Web fallback: localStorage (geliştirme amaçlı)
 // ==========================================
+
+const GROQ_PREFS_KEY = 'groq_api_key';
+
 export const getGroqApiKey = async () => {
-  // Audit: Encryption support for API Keys
+  // 1) Electron — şifreli native keystore
   if (window.electronAPI && typeof window.electronAPI.getApiKey === 'function') {
     try {
       const secureKey = await window.electronAPI.getApiKey();
       if (secureKey) return secureKey;
     } catch (err) {
-      console.error("Secure key retrieval failed:", err);
+      console.error('Electron secure key retrieval failed:', err);
     }
   }
+
+  // 2) Android / iOS — Capacitor Preferences (EncryptedSharedPreferences / Keychain)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { value } = await Preferences.get({ key: GROQ_PREFS_KEY });
+      return value || '';
+    } catch (err) {
+      console.error('Capacitor Preferences get failed:', err);
+    }
+  }
+
+  // 3) Web geliştirme ortamı — localStorage
   return localStorage.getItem('rss_groq_api_key') || '';
 };
 
 export const saveGroqApiKey = async (key) => {
   const cleanKey = key?.trim() || '';
-  
-  // Audit: Encrypt key in Electron environment
+
+  // 1) Electron — şifreli native keystore
   if (window.electronAPI && typeof window.electronAPI.saveApiKey === 'function') {
     try {
       await window.electronAPI.saveApiKey(cleanKey);
-      // Clean up localStorage if it existed
-      localStorage.removeItem('rss_groq_api_key');
+      localStorage.removeItem('rss_groq_api_key'); // Eski plain-text temizle
       return;
     } catch (err) {
-      console.error("Secure key save failed:", err);
+      console.error('Electron secure key save failed:', err);
     }
   }
 
+  // 2) Android / iOS — Capacitor Preferences
+  if (Capacitor.isNativePlatform()) {
+    try {
+      if (cleanKey) {
+        await Preferences.set({ key: GROQ_PREFS_KEY, value: cleanKey });
+      } else {
+        await Preferences.remove({ key: GROQ_PREFS_KEY });
+      }
+      localStorage.removeItem('rss_groq_api_key'); // Varsa eski plain-text temizle
+      return;
+    } catch (err) {
+      console.error('Capacitor Preferences set failed:', err);
+    }
+  }
+
+  // 3) Web fallback
   if (cleanKey) {
     localStorage.setItem('rss_groq_api_key', cleanKey);
   } else {

@@ -1,44 +1,52 @@
-# Google Play Store Yayınlama Klavuzu 🚀
+# Play Store — Veri Güvenliği Formu Doldurma Kılavuzu
 
-Google Play Console'da uygulamayı yayına alırken "Uygulama İçeriği" (App Content) sekmesinde doldurmanız gereken kritik alanlar için hazır şablonlar aşağıdadır.
-
----
-
-### 1. Haber Uygulaması Beyanı (News App)
-**Soru:** Uygulamanız bir haber uygulaması mı?
-**Cevap:** Evet.
-
-**Beyan Metni (İstenirse):**
-"Gündemim, kamuya açık RSS servislerini kullanarak haberleri bir araya getiren teknik bir araçtır. Uygulama, haber içeriklerine editoryal müdahalede bulunmaz; içerikleri otomatik olarak çeker ve kullanıcıyı doğrudan orijinal kaynağa (yayıncıya) yönlendirir."
+Bu belge, Google Play Console'daki **"Uygulama içeriği → Veri güvenliği"** formunu adım adım doldurmanıza yardımcı olur.
 
 ---
 
-### 2. Veri Güvenliği (Data Safety) Formu
-Bu formda en önemli kısım **"Üçüncü Taraf İşleme"** kısmıdır.
+## 1. Gizlilik Politikası URL'si
 
-*   **Veri Toplanıyor mu?** Evet (Teknik işleyiş için).
-*   **Veriler Paylaşılıyor mu?** Evet (Özetleme için).
-    *   **Paylaşılan Veri Türü:** Haber metinleri (Üçüncü taraf içerik).
-    *   **Nereye Gidiyor?** Groq (Yapay Zeka Servis Sağlayıcısı).
-*   **Kullanıcı Verileri (Özel):** Uygulama hiçbir kişisel bilgi (isim, e-posta, rehber, konum) toplamaz. Her şey yerel cihazda (on-device) saklanır.
-*   **Şifreleme:** "Cihaz ile sunucu arasındaki tüm veriler (RSS linkleri ve AI özet istekleri) HTTPS üzerinden güvenli bir şekilde iletilir." (MANIFEST'teki fix'imiz sayesinde).
+Önce `PRIVACY_POLICY.md` dosyasını GitHub Gist olarak yayınlayın:
 
----
-
-### 3. Gizlilik Politikası URL'si (Zorunlu)
-Google, uygulama silinse bile erişilebilen **genel bir URL** ister. 
-**Yapmanız Gereken:**
-1.  Uygulama içindeki `Legal.jsx` içeriğini kopyalayın.
-2.  [GitHub Gist](https://gist.github.com/) veya bir metin paylaşım sitesine yapıştırın.
-3.  Oluşan linki Google Play Console'daki "Gizlilik Politikası URL'si" alanına girin.
+1. https://gist.github.com adresine gidin
+2. Yeni bir **public** gist oluşturun, `PRIVACY_POLICY.md` içeriğini yapıştırın
+3. **"Create public gist"** butonuna tıklayın
+4. Gist URL'sini kopyalayın (örn: `https://gist.github.com/OmerCanInan/xxxx`)
+5. Play Console → **Uygulama içeriği → Gizlilik politikası** → URL'yi yapıştırın
 
 ---
 
-### 4. Teknik Bilgiler (Audit Kontrolü)
-*   **Paket Adı (Package ID):** `com.omer.reader` (Senkronize edildi).
-*   **Min SDK:** 21 (Android 5.0+).
-*   **Target SDK:** 34 (Android 14) veya en günceli.
+## 2. Veri Güvenliği Formu
+
+Play Console → **Uygulama içeriği → Veri güvenliği → Başlayın**
+
+### Bölüm 1: Veri toplama ve paylaşma
+
+| Soru | Cevap |
+|------|-------|
+| Uygulamanız veri topluyor mu? | **Hayır** — "Bu uygulama herhangi bir veri toplamaz" seçeneğini işaretleyin |
+
+> Groq veya LibreTranslate kullansanız bile: bu veriler *siz tarafınızdan* üçüncü tarafa gönderilir, uygulama *toplamaz*.
+
+### Bölüm 2: Güvenlik uygulamaları
+
+| Soru | Cevap | Neden |
+|------|-------|-------|
+| Veriler aktarım sırasında şifreleniyor mu? | **Evet** | Tüm RSS, Groq ve LibreTranslate bağlantıları HTTPS/TLS kullanır |
+| Kullanıcı verileri silinmesi mümkün mü? | **Evet** | Kullanıcı uygulama verilerini uygulama içinden silebilir |
+
+### Bölüm 3: Veri türleri (hiçbirini seçmeyin)
+
+Uygulamanız aşağıdaki kategorilerden **hiçbirini** toplamadığından kutuları **boş bırakın**:
+
+- Konum, Kişisel bilgiler, Finansal bilgiler, Sağlık, Mesajlar, Fotoğraf/video, Ses, Dosyalar, Takvim, Kişiler, Uygulama etkinliği, Web tarama, Cihaz kimlikleri
 
 ---
 
-**NOT:** Bu bilgiler uygulamanın V13 (Hardened) sürümüne tam uyumludur. Gönül rahatlığıyla formları doldurabilirsiniz.
+## 3. Form Sonrası Kontrol Listesi
+
+- [ ] Gist URL'si Play Console'a eklendi
+- [ ] Veri güvenliği formu kaydedildi
+- [x] `allowBackup="false"` AndroidManifest.xml'de (yapıldı)
+- [x] Groq API key Capacitor Preferences ile saklanıyor (yapıldı)
+- [x] LibreTranslate'e geçiş yapıldı (yapıldı)
