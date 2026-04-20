@@ -170,12 +170,16 @@ export const RadioProvider = ({ children }) => {
         for (const ep of endpoints) {
           // 1. Yol: JSON
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+
             const resJSON = await fetch(ep, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ q: finalTitle, source: 'auto', target: 'tr', format: 'text' }),
-              signal: AbortSignal.timeout(6000)
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
             if (resJSON.ok) {
               const data = await resJSON.json();
               if (data?.translatedText) {
@@ -187,6 +191,9 @@ export const RadioProvider = ({ children }) => {
 
           // 2. Yol: Form Data
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+
             const params = new URLSearchParams();
             params.append('q', finalTitle);
             params.append('source', 'auto');
@@ -196,9 +203,10 @@ export const RadioProvider = ({ children }) => {
             const resForm = await fetch(ep, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params,
-              signal: AbortSignal.timeout(6000)
+              body: params.toString(), // Android uyumluluğu için String
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
             if (resForm.ok) {
               const data = await resForm.json();
               if (data?.translatedText) {

@@ -30,24 +30,30 @@ export const translateTextToTurkish = async (text) => {
   }
 
   // Mobile / Web: Use LibreTranslate (Play Store Compliant)
-  // Her sunucu için hem JSON hem de Form Data (URLSearchParams) yöntemlerini deniyoruz.
   for (const endpoint of LIBRE_ENDPOINTS) {
     // 1. Yol: JSON İsteği
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12sn limit
+
       const resJSON = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ q: text, source: 'auto', target: 'tr', format: 'text' }),
-        signal: AbortSignal.timeout(6000), 
+        signal: controller.signal, 
       });
+      clearTimeout(timeoutId);
       if (resJSON.ok) {
         const data = await resJSON.json();
         if (data?.translatedText) return data.translatedText;
       }
-    } catch (e) { /* JSON Başarısız, Form Data'yı dene */ }
+    } catch (e) { /* Fallback'e geç */ }
 
-    // 2. Yol: Form Data (Bazı sunucular sadece bunu kabul eder)
+    // 2. Yol: Form Data (URLSearchParams.toString() - En uyumlu yöntem)
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const params = new URLSearchParams();
       params.append('q', text);
       params.append('source', 'auto');
@@ -57,9 +63,10 @@ export const translateTextToTurkish = async (text) => {
       const resForm = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params,
-        signal: AbortSignal.timeout(6000), 
+        body: params.toString(), // String'e zorla (Eski Android uyumu için)
+        signal: controller.signal, 
       });
+      clearTimeout(timeoutId);
       if (resForm.ok) {
         const data = await resForm.json();
         if (data?.translatedText) return data.translatedText;
@@ -67,6 +74,6 @@ export const translateTextToTurkish = async (text) => {
     } catch (e) { /* Bir sonraki sunucuya geç */ }
   }
 
-  console.warn('Translation: All methods (JSON & Form) failed for all endpoints.');
+  console.warn('Translation: Android compatible attempts failed for all endpoints.');
   return text;
 };
