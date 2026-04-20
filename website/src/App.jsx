@@ -1,4 +1,5 @@
 import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText, Monitor, CheckCircle, Smartphone } from 'lucide-react';
+import logo from './assets/logo.png';
 
 function App() {
   const latestReleaseUrl = "https://github.com/OmerCanInan/Gundemim/releases/latest";
@@ -7,13 +8,16 @@ function App() {
     <div className="landing">
       {/* Hero Section */}
       <header className="hero container">
-        <p className="hero-tagline fade-in">Yapay Zeka Destekli Haber Deneyimi</p>
+        <div className="fade-in" style={{ marginBottom: '2rem' }}>
+          <img src={logo} alt="Gündemim Logo" style={{ width: '80px', height: '80px', borderRadius: '16px' }} />
+        </div>
+        <p className="hero-tagline fade-in">TÜM HABERLER TEK NOKTADA</p>
         <h1 className="hero-title fade-in" style={{ animationDelay: '0.1s' }}>
-          Haberin Ötesini <span>Dinleyin ve Keşfedin.</span>
+          Gündeminizi <span>Tek Bir Yerden</span> Yönetin.
         </h1>
         <p className="hero-desc fade-in" style={{ animationDelay: '0.2s' }}>
-          Gündemim, karmaşık haber akışlarını yapay zeka ile özetleyen, reklamdan arındırılmış ve 
-          kişisel radyo moduna sahip yeni nesil bir haber okuyucudur.
+          Onlarca farklı haber kaynağını tek bir çatı altında toplayan, kişiselleştirilebilir, 
+          tamamen reklamsız ve modern bir haber okuma platformu.
         </p>
         
         <div className="fade-in" style={{ 
