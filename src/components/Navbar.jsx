@@ -5,7 +5,28 @@ import { Newspaper, Languages, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Navbar({ toggleSidebar }) {
-  const { isTranslationEnabled, toggleTranslation } = useTranslation();
+  const { isTranslationEnabled, toggleTranslation, hasSeenDownloadWarning, markWarningAsSeen } = useTranslation();
+
+  const handleToggle = () => {
+    const isMobile = window.Capacitor && window.Capacitor.isNativePlatform();
+    
+    // Eğer çeviri açılıyorsa ve henüz uyarı görülmemişse (sadece mobilde)
+    if (!isTranslationEnabled && !hasSeenDownloadWarning && isMobile) {
+      const confirmed = window.confirm(
+        "Çeviri özelliğini ilk kez açıyorsunuz. \n\n" +
+        "Mobil cihazlarda daha hızlı ve çevrimdışı çeviri yapabilmek için " +
+        "yaklaşık 30MB boyutunda küçük bir dil paketi bir defaya mahsus indirilecektir. \n\n" +
+        "Devam etmek istiyor musunuz?"
+      );
+      
+      if (confirmed) {
+        markWarningAsSeen();
+        toggleTranslation();
+      }
+    } else {
+      toggleTranslation();
+    }
+  };
 
   return (
     <nav className="navbar">
@@ -26,7 +47,7 @@ export default function Navbar({ toggleSidebar }) {
 
           <button 
             className={`toggle-button ${isTranslationEnabled ? 'active' : ''}`}
-            onClick={toggleTranslation}
+            onClick={handleToggle}
             aria-pressed={isTranslationEnabled}
           >
             <Languages size={18} />

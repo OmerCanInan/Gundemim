@@ -5,15 +5,18 @@ const TranslationContext = createContext();
 
 export const TranslationProvider = ({ children }) => {
   const [isTranslationEnabled, setIsTranslationEnabled] = useState(false);
+  const [hasSeenDownloadWarning, setHasSeenDownloadWarning] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Yükleme: Preferences'tan ayarı çek
   useEffect(() => {
     const loadPreference = async () => {
       try {
-        const { value } = await Preferences.get({ key: 'autoTranslate' });
-        // Sadece 'true' ise açık kabul et
-        setIsTranslationEnabled(value === 'true');
+        const { value: autoTranslate } = await Preferences.get({ key: 'autoTranslate' });
+        const { value: seenWarning } = await Preferences.get({ key: 'hasSeenDownloadWarning' });
+        
+        setIsTranslationEnabled(autoTranslate === 'true');
+        setHasSeenDownloadWarning(seenWarning === 'true');
       } catch (err) {
         console.error('[Preferences] Load failed:', err);
       } finally {
@@ -32,17 +35,27 @@ export const TranslationProvider = ({ children }) => {
           key: 'autoTranslate',
           value: isTranslationEnabled.toString()
         });
+        await Preferences.set({
+          key: 'hasSeenDownloadWarning',
+          value: hasSeenDownloadWarning.toString()
+        });
       } catch (err) {
         console.error('[Preferences] Save failed:', err);
       }
     };
     savePreference();
-  }, [isTranslationEnabled, isInitialized]);
+  }, [isTranslationEnabled, hasSeenDownloadWarning, isInitialized]);
 
-  const toggleTranslation = () => setIsTranslationEnabled(prev => !prev);
+  const markWarningAsSeen = () => setHasSeenDownloadWarning(true);
 
   return (
-    <TranslationContext.Provider value={{ isTranslationEnabled, toggleTranslation, isInitialized }}>
+    <TranslationContext.Provider value={{ 
+      isTranslationEnabled, 
+      toggleTranslation, 
+      isInitialized,
+      hasSeenDownloadWarning,
+      markWarningAsSeen
+    }}>
       {children}
     </TranslationContext.Provider>
   );
