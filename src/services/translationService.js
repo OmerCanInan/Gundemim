@@ -3,7 +3,7 @@
 // Gayriresmi Google Translate API'sinden (translate.googleapis.com) göç edildi.
 // Hizmet veren public instance'lar: libretranslate.com, translate.argosopentech.com
 
-import { Translation, Language } from '@capacitor-mlkit/translation';
+// ML Kit Translation importu sadece native platformlarda dinamik olarak yapılacak.
 
 const LIBRE_ENDPOINTS = [
   'https://libretranslate.de/translate',
@@ -41,8 +41,9 @@ const translateWithMLKit = async (text) => {
   try {
     if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return null;
 
-    // Not: Model indirilmemişse otomatik indirilir (30MB civarı).
-    // Gelecekte Language ID eklenirse sourceLanguage dinamik yapılabilir.
+    // Dinamik import: Sadece native platformda çalışır
+    const { Translation, Language } = await import('@capacitor-mlkit/translation');
+
     const result = await Translation.translate({
       text,
       sourceLanguage: Language.English,

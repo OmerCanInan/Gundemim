@@ -65,12 +65,18 @@ function createWindow() {
   });
 
   if (isDev) {
-    win.webContents.session.clearCache().then(() => {
-      win.loadURL('http://localhost:5173');
-      win.webContents.openDevTools({ mode: 'right' });
+    console.log('[Electron] Loading dev server: http://localhost:5173');
+    win.loadURL('http://localhost:5173').catch(() => {
+      console.log('[Electron] Retrying loadURL in 1s...');
+      setTimeout(() => win.loadURL('http://localhost:5173'), 1000);
     });
+    win.webContents.openDevTools({ mode: 'right' });
+    // Cache temizliğini arka planda yap
+    win.webContents.session.clearCache().catch(() => {});
   } else {
-    win.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    win.loadFile(path.join(__dirname, 'dist', 'index.html')).catch(err => {
+      console.error('[Electron] Failed to load production file:', err);
+    });
   }
 }
 
@@ -183,6 +189,9 @@ app.on('web-contents-created', (event, contents) => {
     contents.spawnTime = Date.now();
     
     contents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      // Geliştirme sunucusu (localhost) hatalarını görmezden gel, yönlendirme yapma
+      if (validatedURL && (validatedURL.includes('localhost') || validatedURL.includes('127.0.0.1'))) return;
+
       // Only redirect if it fails immediately during load
       if (Date.now() - contents.spawnTime > LOAD_GRACE_PERIOD_MS) return;
       if (validatedURL && validatedURL.startsWith('http')) {
@@ -197,8 +206,12 @@ app.on('web-contents-created', (event, contents) => {
 app.whenReady().then(() => {
   createWindow();
 
-  if (autoUpdater) {
-    autoUpdater.checkForUpdatesAndNotify();
+  // Yalnızca paketlenmiş (production) sürümde güncellemeleri kontrol et
+  if (!isDev && autoUpdater) {
+    console.log('[Electron] Checking for updates...');
+    autoUpdater.checkForUpdatesAndNotify().catch(err => {
+      console.warn('[Electron] Update check failed:', err);
+    });
   }
 
   app.on('activate', () => {

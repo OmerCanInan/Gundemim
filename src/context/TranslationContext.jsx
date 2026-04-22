@@ -12,8 +12,19 @@ export const TranslationProvider = ({ children }) => {
   useEffect(() => {
     const loadPreference = async () => {
       try {
-        const { value: autoTranslate } = await Preferences.get({ key: 'autoTranslate' });
-        const { value: seenWarning } = await Preferences.get({ key: 'hasSeenDownloadWarning' });
+        let autoTranslate = 'false';
+        let seenWarning = 'false';
+
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+          const { value } = await Preferences.get({ key: 'autoTranslate' });
+          const { value: sw } = await Preferences.get({ key: 'hasSeenDownloadWarning' });
+          autoTranslate = value;
+          seenWarning = sw;
+        } else {
+          // PC / Web Fallback
+          autoTranslate = localStorage.getItem('autoTranslate') || 'false';
+          seenWarning = localStorage.getItem('hasSeenDownloadWarning') || 'false';
+        }
         
         setIsTranslationEnabled(autoTranslate === 'true');
         setHasSeenDownloadWarning(seenWarning === 'true');
@@ -31,14 +42,20 @@ export const TranslationProvider = ({ children }) => {
     if (!isInitialized) return;
     const savePreference = async () => {
       try {
-        await Preferences.set({
-          key: 'autoTranslate',
-          value: isTranslationEnabled.toString()
-        });
-        await Preferences.set({
-          key: 'hasSeenDownloadWarning',
-          value: hasSeenDownloadWarning.toString()
-        });
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+          await Preferences.set({
+            key: 'autoTranslate',
+            value: isTranslationEnabled.toString()
+          });
+          await Preferences.set({
+            key: 'hasSeenDownloadWarning',
+            value: hasSeenDownloadWarning.toString()
+          });
+        } else {
+          // PC / Web Fallback
+          localStorage.setItem('autoTranslate', isTranslationEnabled.toString());
+          localStorage.setItem('hasSeenDownloadWarning', hasSeenDownloadWarning.toString());
+        }
       } catch (err) {
         console.error('[Preferences] Save failed:', err);
       }

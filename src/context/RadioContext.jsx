@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { getAppSettings } from '../services/dbService';
-import { TextToSpeech } from '@capacitor-community/text-to-speech';
+// TextToSpeech importu sadece native platformlarda dinamik olarak yapılacak.
 
 const RadioContext = createContext();
 
@@ -23,16 +23,21 @@ export const RadioProvider = ({ children }) => {
   // Sesleri yükle ve dinle (Özellikle mobilde geç yüklenir)
   useEffect(() => {
     const loadVoices = async () => {
+      // NATIVE PLATFORM CHECK
       if (window.Capacitor && window.Capacitor.isNativePlatform()) {
         try {
-          const { voices } = await TextToSpeech.getSupportedVoices();
-          setAvailableVoices(voices);
-          return;
+          const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
+          if (TextToSpeech) {
+            const { voices } = await TextToSpeech.getSupportedVoices();
+            setAvailableVoices(voices);
+            return;
+          }
         } catch (e) {
           console.warn("Native voices fetch failed:", e);
         }
       }
 
+      // WEB / PC FALLBACK
       if (window.speechSynthesis) {
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
@@ -199,6 +204,7 @@ export const RadioProvider = ({ children }) => {
     // --- NATIVE MOBILE TTS (Huawei & GMS Compatible) ---
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
       try {
+        const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
         await TextToSpeech.speak({
           text: fullSpeechText,
           lang: 'tr-TR',
@@ -251,6 +257,7 @@ export const RadioProvider = ({ children }) => {
     // Priming for Mobile
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
       try {
+        const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
         await TextToSpeech.stop();
       } catch (e) {}
     }
@@ -280,6 +287,7 @@ export const RadioProvider = ({ children }) => {
     
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
       try {
+        const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
         await TextToSpeech.stop();
       } catch (e) {}
     }
