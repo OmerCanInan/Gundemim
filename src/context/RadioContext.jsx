@@ -284,21 +284,31 @@ export const RadioProvider = ({ children }) => {
     setIsPlaying(false);
     isPlayingRef.current = false;
     setCurrentIndex(-1);
+    setCurrentQueue([]); // Listeyi tamamen sıfırla
 
+    // 1. Native Mobil Durdurma (Capacitor)
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
       try {
-        await TextToSpeech.stop();
-      } catch (e) { }
+        const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
+        await TextToSpeech.stop().catch(() => {});
+      } catch (e) {
+        console.warn('[Radio] Native stop failed:', e);
+      }
     }
 
+    // 2. Tarayıcı Durdurma (Web Speech API)
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
 
+    // 3. Google Audio / AI Audio Durdurma
     if (googleTtsRef.current) {
       googleTtsRef.current.pause();
       googleTtsRef.current.src = "";
+      googleTtsRef.current = null;
     }
+    
+    console.log('[Radio] Tüm ses işlemleri durduruldu.');
   };
 
   const value = {
