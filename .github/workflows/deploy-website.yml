@@ -29,7 +29,7 @@ jobs:
       - name: Build Website
         working-directory: website
         run: |
-          npm install --legacy-peer-deps
+          npm install --force
           npm run build
 
       - name: Setup Pages
