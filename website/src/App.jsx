@@ -1,7 +1,7 @@
 import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText, Monitor, CheckCircle, Smartphone, AlertTriangle } from 'lucide-react';
 
 function App() {
-  const latestReleaseUrl = "https://github.com/OmerCanInan/Gundemim/releases/latest";
+  const latestReleaseUrl = "https://github.com/OmerCanInan/Gundemim/releases/latest"; // v1.1.3 trigger
 
   return (
     <div className="landing">
