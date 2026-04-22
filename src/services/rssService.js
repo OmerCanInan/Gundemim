@@ -313,6 +313,15 @@ export const generateTags = (title = '', description = '', sourceName = '') => {
     }
   });
 
+  // --- AKILLI DİL ALGILAMA (V13) ---
+  const isTurkish = /[ğüşıöçĞÜŞİÖÇ]/.test(title + ' ' + description);
+  if (isTurkish) {
+    tags.push('#tr');
+  } else {
+    // Türkçe değilse (veya karakter yoksa) yabancı dil olduğunu varsayabiliriz
+    tags.push('#en'); // Genel yabancı dil etiketi
+  }
+
   // Hiçbir kategoriye uymayan haberler için genel tag
   if (tags.length === 0) tags.push('#genel');
 

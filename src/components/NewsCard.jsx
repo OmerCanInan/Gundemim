@@ -37,8 +37,10 @@ export default function NewsCard({ news, onTagClick, activeTag }) {
     let active = true;
 
     const translateContent = async () => {
-      // Çeviri açık değilse veya zaten çevirildiyse tekrar istek atma.
-      if (!isTranslationEnabled || translatedTitle) return;
+      // AKILLI FİLTRE: Eğer haber zaten Türkçe ise (#tr etiketi varsa) çevirme.
+      const isAlreadyTurkish = news.tags?.includes('#tr');
+      
+      if (!isTranslationEnabled || translatedTitle || isAlreadyTurkish) return;
 
       setIsTranslating(true);
       try {
