@@ -17,7 +17,6 @@ const DISCOVER_FEEDS = [
     { name: "Medyascope", url: "https://medyascope.tv/feed/" },
     { name: "Euronews TR", url: "https://tr.euronews.com/rss?level=vertical&name=turkey" },
     { name: "Milliyet", url: "https://www.milliyet.com.tr/rss/rssNew/gundemRss.xml" },
-    { name: "Karar Gazetesi", url: "https://www.karar.com/rss.xml" },
     { name: "Anadolu Ajansı", url: "https://www.aa.com.tr/tr/rss/default?cat=guncel" }
   ]},
   { folder: "Oyun Sektörü", feeds: [
@@ -38,7 +37,6 @@ const DISCOVER_FEEDS = [
     { name: "LOG Dergisi", url: "https://www.log.com.tr/feed/" },
     { name: "Hwp (Hardware Plus)", url: "https://hwp.com.tr/feed" },
     { name: "TechInside", url: "https://www.techinside.com/feed/" },
-    { name: "Megabayt", url: "https://megabayt.com/feed/" },
     { name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
     { name: "TechCrunch", url: "https://techcrunch.com/feed/" },
     { name: "Wired", url: "https://www.wired.com/feed/rss" }
@@ -57,10 +55,6 @@ const DISCOVER_FEEDS = [
     { name: "BTCHaber", url: "https://www.btchaber.com/feed/" },
     { name: "CoinDesk", url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
     { name: "Cointelegraph", url: "https://cointelegraph.com/rss" }
-  ]},
-  { folder: "Spor", feeds: [
-    { name: "Ajansspor", url: "https://ajansspor.com/rss" },
-    { name: "Mackolik", url: "https://www.mackolik.com/rss" }
   ]}
 ];
 
