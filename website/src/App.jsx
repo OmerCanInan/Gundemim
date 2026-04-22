@@ -1,4 +1,4 @@
-import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText, Monitor, CheckCircle, Smartphone } from 'lucide-react';
+import { Bot, Headphones, Shield, Zap, Download, Github, Globe, FileText, Monitor, CheckCircle, Smartphone, AlertTriangle } from 'lucide-react';
 
 function App() {
   const latestReleaseUrl = "https://github.com/OmerCanInan/Gundemim/releases/latest";
@@ -51,6 +51,33 @@ function App() {
             <a href={latestReleaseUrl} className="btn btn-outline w-full" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
               <Globe size={18} /> .APK İndir
             </a>
+          </div>
+        </div>
+
+        {/* Lisans ve Güvenlik Bilgilendirmesi */}
+        <div className="fade-in" style={{ 
+          marginTop: '2rem',
+          padding: '1.5rem',
+          borderRadius: '12px',
+          background: 'rgba(245, 158, 11, 0.05)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          maxWidth: '900px',
+          width: '100%',
+          textAlign: 'left',
+          display: 'flex',
+          gap: '1rem',
+          animationDelay: '0.4s'
+        }}>
+          <div style={{ color: '#f59e0b', marginTop: '3px' }}>
+            <AlertTriangle size={24} />
+          </div>
+          <div style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'rgba(255,255,255,0.8)' }}>
+            <strong style={{ color: '#f59e0b', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              Kurulum Hakkında Önemli Not
+            </strong>
+            Gündemim, bağımsız bir açık kaynak projesidir. Yüksek yıllık sertifikalandırma maliyetleri (lisans ücretleri) nedeniyle uygulama şu an için dijital olarak imzalanmamıştır. 
+            Bu sebeple kurulum sırasında Windows (SmartScreen) veya Android tarafından <strong>"Bilinmeyen Yayıncı"</strong> uyarıları alabilirsiniz. 
+            Bu uyarılar uygulamanın güvenliği ile ilgili değil, sadece lisans kaydı maliyetleri ile ilgilidir. Uygulamayı gönül rahatlığıyla "Yine de Çalıştır/Yükle" diyerek kurabilirsiniz.
           </div>
         </div>
 
