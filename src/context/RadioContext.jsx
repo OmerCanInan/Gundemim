@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { getAppSettings } from '../services/dbService';
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
 const RadioContext = createContext();
 
@@ -21,11 +22,22 @@ export const RadioProvider = ({ children }) => {
 
   // Sesleri yükle ve dinle (Özellikle mobilde geç yüklenir)
   useEffect(() => {
-    const loadVoices = () => {
-      if (!window.speechSynthesis) return;
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        setAvailableVoices(voices);
+    const loadVoices = async () => {
+      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        try {
+          const { voices } = await TextToSpeech.getSupportedVoices();
+          setAvailableVoices(voices);
+          return;
+        } catch (e) {
+          console.warn("Native voices fetch failed:", e);
+        }
+      }
+
+      if (window.speechSynthesis) {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          setAvailableVoices(voices);
+        }
       }
     };
 
@@ -34,10 +46,9 @@ export const RadioProvider = ({ children }) => {
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
     
-    // Fallback için her saniye bir kez kontrol et (Bazı mobil WebView'larda event tetiklenmeyebiliyor)
     const timer = setInterval(() => {
       if (availableVoices.length === 0) loadVoices();
-    }, 1000);
+    }, 2000);
 
     return () => clearInterval(timer);
   }, [availableVoices.length]);
@@ -142,8 +153,6 @@ export const RadioProvider = ({ children }) => {
   };
 
   const playNext = async (index, list) => {
-    const hasSpeech = 'speechSynthesis' in window;
-
     if (!isPlayingRef.current || index >= list.length) {
       stopRadio();
       return;
@@ -153,73 +162,11 @@ export const RadioProvider = ({ children }) => {
     const item = list[index];
 
     let finalTitle = item.title;
+    // Çeviri servisini kullan (Eğer çevirilmiş hali yoksa)
+    // Not: translationService.js içindeki translateTextToTurkish ML Kit + Fallback destekliyor.
     try {
-      if (window.electronAPI && typeof window.electronAPI.translateText === 'function') {
-        // --- DESKTOP (Electron) - Use Safe IPC Bridge ---
-        const translatedText = await window.electronAPI.translateText(finalTitle, 'tr');
-        if (translatedText) finalTitle = translatedText;
-      } else {
-        // --- MOBILE / WEB (LibreTranslate - Play Store Safe) ---
-        const endpoints = [
-          'https://libretranslate.de/translate',
-          'https://de.libretranslate.com/translate',
-          'https://translate.terraprint.co/translate'
-        ];
-        
-        let translated = null;
-        for (const ep of endpoints) {
-          // 1. Yol: JSON
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-            const resJSON = await fetch(ep, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ q: finalTitle, source: 'auto', target: 'tr', format: 'text' }),
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            if (resJSON.ok) {
-              const data = await resJSON.json();
-              if (data?.translatedText) {
-                translated = data.translatedText;
-                break;
-              }
-            }
-          } catch (e) { /* JSON Başarısız, Form Data'yı dene */ }
-
-          // 2. Yol: Form Data
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-            const params = new URLSearchParams();
-            params.append('q', finalTitle);
-            params.append('source', 'auto');
-            params.append('target', 'tr');
-            params.append('format', 'text');
-
-            const resForm = await fetch(ep, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params.toString(), // Android uyumluluğu için String
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            if (resForm.ok) {
-              const data = await resForm.json();
-              if (data?.translatedText) {
-                translated = data.translatedText;
-                break;
-              }
-            }
-          } catch (e) { 
-            console.warn(`Radyo çeviri denemesi başarısız (${ep}):`, e);
-          }
-        }
-        if (translated) finalTitle = translated;
-      }
+      const { translateTextToTurkish } = await import('../services/translationService');
+      finalTitle = await translateTextToTurkish(item.title);
     } catch (err) {
       console.warn("Radyo çeviri hatası:", err);
     }
@@ -243,15 +190,32 @@ export const RadioProvider = ({ children }) => {
     const introText = cleanSource ? `${cleanSource} bildiriyor: ` : 'Sıradaki haber: ';
     const fullSpeechText = sanitizeForAudio(introText + "... " + finalTitle + ".");
 
-    const gender = voiceGenderRef.current;
-
     const goNext = () => {
       setTimeout(() => {
         if (isPlayingRef.current) playNext(index + 1, list);
       }, 800);
     };
 
-    if (gender === 'female') {
+    // --- NATIVE MOBILE TTS (Huawei & GMS Compatible) ---
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      try {
+        await TextToSpeech.speak({
+          text: fullSpeechText,
+          lang: 'tr-TR',
+          rate: playbackRateRef.current,
+          pitch: voiceGenderRef.current === 'female' ? 1.1 : 0.9,
+          volume: 1.0,
+          category: 'ambient',
+        });
+        goNext();
+        return;
+      } catch (err) {
+        console.warn("Native TTS failed, falling back to web:", err);
+      }
+    }
+
+    // --- WEB / DESKTOP FALLBACK ---
+    if (voiceGenderRef.current === 'female') {
       try {
         const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(fullSpeechText)}&tl=tr&client=tw-ob`;
         let audio = googleTtsRef.current;
@@ -273,45 +237,33 @@ export const RadioProvider = ({ children }) => {
       utterance.rate = playbackRateRef.current;
       utterance.pitch = 0.9;
 
-      // En iyi Türkçe sesini bul
       const trVoices = availableVoices.filter(v => v.lang.startsWith('tr'));
-      let selectedVoice = null;
+      let selectedVoice = trVoices.find(v => v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('tolga')) || trVoices[0];
       
-      if (trVoices.length > 0) {
-        // Öncelik: Erkek olarak bilinen sesler (Tolga, Male vb)
-        selectedVoice = trVoices.find(v => v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('tolga'));
-        // Yoksa herhangi bir Türkçe ses
-        if (!selectedVoice) selectedVoice = trVoices[0];
-      }
-
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-
+      if (selectedVoice) utterance.voice = selectedVoice;
       utterance.onend = goNext;
-      utterance.onerror = (e) => {
-        console.error("Speech error", e);
-        goNext();
-      };
-
+      utterance.onerror = goNext;
       window.speechSynthesis.speak(utterance);
     }
   };
 
-  const startRadio = (list, index = 0) => {
-    // MOBİL İÇİN MOTORLARI HAZIRLA (Priming)
-    // 1. Audio Motoru
+  const startRadio = async (list, index = 0) => {
+    // Priming for Mobile
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      try {
+        await TextToSpeech.stop();
+      } catch (e) {}
+    }
+
     if (typeof Audio !== 'undefined') {
       const unlockAudio = new Audio();
-      unlockAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhAAWAAWAnYmF0YQAAAAA="; // 1ms sessizlik
+      unlockAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhAAWAAWAnYmF0YQAAAAA=";
       unlockAudio.play().catch(() => {});
       googleTtsRef.current = unlockAudio;
     }
-    // 2. Speech Motoru
-    if ('speechSynthesis' in window) {
+
+    if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
-      const primeUtterance = new SpeechSynthesisUtterance("");
-      window.speechSynthesis.speak(primeUtterance);
     }
 
     stopRadio(); 
@@ -321,19 +273,24 @@ export const RadioProvider = ({ children }) => {
     playNext(index, list);
   };
 
-  const stopRadio = () => {
+  const stopRadio = async () => {
     setIsPlaying(false);
     isPlayingRef.current = false;
     setCurrentIndex(-1);
     
-    if ('speechSynthesis' in window) {
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      try {
+        await TextToSpeech.stop();
+      } catch (e) {}
+    }
+
+    if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
     
     if (googleTtsRef.current) {
       googleTtsRef.current.pause();
       googleTtsRef.current.src = "";
-      // googleTtsRef.current = null; // Don't nullify if we want to reuse it for priming
     }
   };
 
@@ -352,3 +309,4 @@ export const RadioProvider = ({ children }) => {
 
   return <RadioContext.Provider value={value}>{children}</RadioContext.Provider>;
 };
+
