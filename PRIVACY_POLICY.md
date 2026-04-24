@@ -1,28 +1,41 @@
-# Privacy Policy for Gündemim
+# Privacy Policy / Gizlilik Politikası
 
-**Last updated: April 24, 2026**
+**Last updated / Son Güncelleme: April 24, 2026**
+
+---
+
+## English Version
 
 Gündemim ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our mobile application "Gündemim".
 
-## 1. Information Collection and Use
-
-### Personal Data
+### 1. Information Collection and Use
 Gündemim is designed to work as a local RSS reader. We **do not collect** any personally identifiable information (PII) such as your name, email address, or phone number. All your news sources, categories, and preferences are stored **locally on your device**.
 
-### AI Features (Optional)
-If you use the AI Summary feature, the news headlines and descriptions are sent to Groq/Google API for summarization. This data is not linked to your identity.
+### 2. AI & Translation Features
+*   **AI Summary:** Headlines and descriptions are sent to Groq/Google API for summarization. This data is not linked to your identity.
+*   **Translation:** We use **Google ML Kit** for on-device translation on mobile devices (no data leaves the device). As a fallback and on web/desktop platforms, we use **LibreTranslate** (an open-source, privacy-friendly translation service).
 
-### Translation Features
-If you use the Translation feature, it runs locally on your device using Google ML Kit. No text is sent to our servers for translation.
+### 3. Storage
+All data is stored in your device's local storage. Deleting the application will remove all stored data.
 
-## 2. Storage
-All data, including your RSS feeds and settings, are stored in your device's local storage. If you delete the application, this data will also be deleted.
+### 4. Contact Us
+If you have any questions, please contact us at: **omer1243a@gmail.com**
 
-## 3. Third-Party Services
-Our app displays content from various RSS feeds. We are not responsible for the privacy practices of these third-party news websites. We encourage you to read their privacy policies.
+---
 
-## 4. Changes to This Privacy Policy
-We may update our Privacy Policy from time to time. You are advised to review this page periodically for any changes.
+## Türkçe Versiyon
 
-## 5. Contact Us
-If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at: [Your Contact Email]
+Gündemim ("biz", "bizim" veya "bize"), gizliliğinizi korumayı taahhüt eder. Bu Gizlilik Politikası, "Gündemim" mobil uygulamasını kullandığınızda bilgilerinizin nasıl toplandığını, kullanıldığını ve korunduğunu açıklar.
+
+### 1. Bilgi Toplama ve Kullanım
+Gündemim, yerel bir RSS okuyucu olarak tasarlanmıştır. İsim, e-posta adresi veya telefon numarası gibi kişisel olarak tanımlanabilir bilgileri (PII) **toplamıyoruz**. Tüm haber kaynaklarınız, kategorileriniz ve tercihleriniz **yerel olarak cihazınızda** saklanır.
+
+### 2. Yapay Zeka ve Çeviri Özellikleri
+*   **AI Özeti:** Haber başlıkları ve açıklamaları, özetleme için Groq/Google API'lerine gönderilir. Bu veriler kimliğinizle ilişkilendirilmez.
+*   **Çeviri:** Mobil cihazlarda cihaz içi çeviri için **Google ML Kit** kullanıyoruz (veriler cihazdan çıkmaz). Yedek olarak ve web/masaüstü platformlarında **LibreTranslate** (açık kaynaklı, gizlilik dostu bir çeviri servisi) kullanıyoruz.
+
+### 3. Veri Saklama
+Tüm veriler cihazınızın yerel depolama alanında saklanır. Uygulamanın silinmesi tüm verileri de silecek.
+
+### 4. İletişim
+Sorularınız için bizimle şu adresten iletişime geçebilirsiniz: **omer1243a@gmail.com**
