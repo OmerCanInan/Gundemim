@@ -9,7 +9,7 @@ import Discover from './pages/Discover';
 import HowToUseDrawer from './components/HowToUseDrawer';
 import Legal from './pages/Legal';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { getAppSettings, clearNewsCache } from './services/dbService';
 import { ensureMLKitModelReady } from './services/mlKitService';
 import { AlertTriangle } from 'lucide-react';
@@ -18,6 +18,45 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHowToUseOpen, setIsHowToUseOpen] = useState(false);
   const [pcNotification, setPcNotification] = useState(null);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+
+  // Mobil: Soldan sağa kaydırınca sidebar aç, sağdan sola kapat
+  const handleTouchStart = useCallback((e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+
+    // Yatay hareket dikey hareketten belirgin biçimde fazlaysa (kaydırma, scroll değil)
+    if (dy > 60) return; // Dikey scroll'u yoksay
+    if (Math.abs(dx) < 60) return; // Kısa dokunuşları yoksay
+
+    if (dx > 0 && touchStartX.current < 40) {
+      // Sol kenarden sağa: sidebar aç
+      setIsSidebarOpen(true);
+    } else if (dx < 0) {
+      // Sağdan sola: sidebar kapat
+      setIsSidebarOpen(false);
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, []);
+
+  useEffect(() => {
+    const isMobile = window.Capacitor?.isNativePlatform() || window.innerWidth < 768;
+    if (!isMobile) return;
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [handleTouchStart, handleTouchEnd]);
 
   // Mobil: ML Kit modelini uygulama açılışında sessizce indir
   useEffect(() => {
