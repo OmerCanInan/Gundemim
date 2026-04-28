@@ -47,75 +47,28 @@ export const ensureMLKitModelReady = async () => {
 
       const { Translation } = await import('@capacitor-mlkit/translation');
 
-      mlKitStatus.set('downloading', 'Çeviri motoru kontrol ediliyor...');
+      // translate() içinde zaten downloadModelIfNeeded() var.
+      // Ayrıca downloadModel() çağırmaya gerek yok — o da hata verebiliyor.
+      // İlk çeviri çağrısında ML Kit modeli otomatik indirir (~30MB, 45sn limit).
+      mlKitStatus.set('downloading', 'Çeviri modeli indiriliyor (~30 MB)...');
 
-      // ADIM 1: Önce direkt çeviri dene — model zaten var mı?
-      try {
-        const testResult = await withTimeout(
-          Translation.translate({ text: 'Hello', sourceLanguage: 'en', targetLanguage: 'tr' }),
-          6000,
-          'test-translate'
-        );
-        if (testResult?.text && testResult.text !== 'Hello') {
-          modelReady = true;
-          mlKitStatus.set('ready', `Hazır ✓ (${testResult.text})`);
-          return true;
-        }
-      } catch {
-        // Model yok, indirmeye geç
-      }
+      const result = await withTimeout(
+        Translation.translate({ text: 'Hello world', sourceLanguage: 'en', targetLanguage: 'tr' }),
+        45000,  // İlk indirme uzun sürebilir
+        'initial-translate-with-download'
+      );
 
-      // ADIM 2: İngilizce modelini indir (30sn timeout)
-      mlKitStatus.set('downloading', 'İngilizce dil paketi indiriliyor...');
-      try {
-        await withTimeout(
-          Translation.downloadModel({ language: 'en' }),
-          30000,
-          'download-en'
-        );
-      } catch (e) {
-        console.error('[MLKit] İngilizce model timeout/hata:', e?.message);
-        mlKitStatus.set('error', `İngilizce model indirilemedi: ${e?.message}`);
-        return false;
-      }
-
-      // ADIM 3: Türkçe modelini indir (30sn timeout)
-      mlKitStatus.set('downloading', 'Türkçe dil paketi indiriliyor...');
-      try {
-        await withTimeout(
-          Translation.downloadModel({ language: 'tr' }),
-          30000,
-          'download-tr'
-        );
-      } catch (e) {
-        console.error('[MLKit] Türkçe model timeout/hata:', e?.message);
-        mlKitStatus.set('error', `Türkçe model indirilemedi: ${e?.message}`);
-        return false;
-      }
-
-      // ADIM 4: Test çevirisi
-      mlKitStatus.set('downloading', 'Model doğrulanıyor...');
-      try {
-        const result = await withTimeout(
-          Translation.translate({ text: 'Hello world', sourceLanguage: 'en', targetLanguage: 'tr' }),
-          8000,
-          'verify-translate'
-        );
-        if (result?.text && result.text !== 'Hello world') {
-          modelReady = true;
-          mlKitStatus.set('ready', `Hazır ✓ (${result.text})`);
-          return true;
-        } else {
-          mlKitStatus.set('error', 'Model yüklendi ama çalışmıyor');
-          return false;
-        }
-      } catch (e) {
-        mlKitStatus.set('error', `Doğrulama başarısız: ${e?.message}`);
+      if (result?.text && result.text !== 'Hello world') {
+        modelReady = true;
+        mlKitStatus.set('ready', `Hazır ✓ (${result.text})`);
+        return true;
+      } else {
+        mlKitStatus.set('error', 'Model yüklendi ama çeviri başarısız');
         return false;
       }
 
     } catch (err) {
-      console.error('[MLKit] Kritik hata:', err);
+      console.error('[MLKit] Kritik hata:', err?.message || err);
       mlKitStatus.set('error', `Hata: ${err?.message || err}`);
       return false;
     }
@@ -123,6 +76,7 @@ export const ensureMLKitModelReady = async () => {
 
   return downloadPromise;
 };
+
 
 /**
  * Haberleri arka planda sessizce çevirir ve cache'e yazar.
