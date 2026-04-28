@@ -1,7 +1,5 @@
 // src/services/mlKitService.js
-// Strateji: downloadModel() YOK.
-// Önce direkt çeviri dene (Play Services zaten modeli arka planda yönetir).
-// Başarısızsa web fallback'e bırak — asla takılma.
+// Robust ML Kit çeviri motoru: timeout + fallback + direkt çeviri dene
 
 import { getCachedTranslation, setCachedTranslation, pruneTranslationCache } from './translationCacheService';
 
@@ -21,61 +19,113 @@ export const mlKitStatus = {
 };
 
 let modelReady = false;
-let modelChecked = false; // Bir kez kontrol et, tekrar deneme
+let downloadPromise = null;
 
-const withTimeout = (promise, ms) =>
+// Timeout wrapper — herhangi bir Promise için
+const withTimeout = (promise, ms, label) =>
   Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms)
+      setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms)
     )
   ]);
 
 /**
- * ML Kit modelinin çalışıp çalışmadığını kontrol et.
- * downloadModel() ÇAĞIRMAZ — sadece translate() dener.
- * Play Services modeli arka planda zaten yönetir.
+ * Önce direkt çeviri dene. Başarılıysa model zaten hazır.
+ * Değilse model indirmeyi başlat.
  */
 export const ensureMLKitModelReady = async () => {
   if (modelReady) return true;
-  if (modelChecked) return false; // Zaten denendi ve başarısız
+  if (downloadPromise) return downloadPromise;
 
-  modelChecked = true;
+  downloadPromise = (async () => {
+    try {
+      if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
+        mlKitStatus.set('error', 'Sadece mobilde çalışır');
+        return false;
+      }
 
-  try {
-    if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
-      mlKitStatus.set('error', 'Sadece mobilde çalışır');
+      const { Translation } = await import('@capacitor-mlkit/translation');
+
+      mlKitStatus.set('downloading', 'Çeviri motoru kontrol ediliyor...');
+
+      // ADIM 1: Önce direkt çeviri dene — model zaten var mı?
+      try {
+        const testResult = await withTimeout(
+          Translation.translate({ text: 'Hello', sourceLanguage: 'en', targetLanguage: 'tr' }),
+          6000,
+          'test-translate'
+        );
+        if (testResult?.text && testResult.text !== 'Hello') {
+          modelReady = true;
+          mlKitStatus.set('ready', `Hazır ✓ (${testResult.text})`);
+          return true;
+        }
+      } catch {
+        // Model yok, indirmeye geç
+      }
+
+      // ADIM 2: İngilizce modelini indir (30sn timeout)
+      mlKitStatus.set('downloading', 'İngilizce dil paketi indiriliyor...');
+      try {
+        await withTimeout(
+          Translation.downloadModel({ language: 'en' }),
+          30000,
+          'download-en'
+        );
+      } catch (e) {
+        console.error('[MLKit] İngilizce model timeout/hata:', e?.message);
+        mlKitStatus.set('error', `İngilizce model indirilemedi: ${e?.message}`);
+        return false;
+      }
+
+      // ADIM 3: Türkçe modelini indir (30sn timeout)
+      mlKitStatus.set('downloading', 'Türkçe dil paketi indiriliyor...');
+      try {
+        await withTimeout(
+          Translation.downloadModel({ language: 'tr' }),
+          30000,
+          'download-tr'
+        );
+      } catch (e) {
+        console.error('[MLKit] Türkçe model timeout/hata:', e?.message);
+        mlKitStatus.set('error', `Türkçe model indirilemedi: ${e?.message}`);
+        return false;
+      }
+
+      // ADIM 4: Test çevirisi
+      mlKitStatus.set('downloading', 'Model doğrulanıyor...');
+      try {
+        const result = await withTimeout(
+          Translation.translate({ text: 'Hello world', sourceLanguage: 'en', targetLanguage: 'tr' }),
+          8000,
+          'verify-translate'
+        );
+        if (result?.text && result.text !== 'Hello world') {
+          modelReady = true;
+          mlKitStatus.set('ready', `Hazır ✓ (${result.text})`);
+          return true;
+        } else {
+          mlKitStatus.set('error', 'Model yüklendi ama çalışmıyor');
+          return false;
+        }
+      } catch (e) {
+        mlKitStatus.set('error', `Doğrulama başarısız: ${e?.message}`);
+        return false;
+      }
+
+    } catch (err) {
+      console.error('[MLKit] Kritik hata:', err);
+      mlKitStatus.set('error', `Hata: ${err?.message || err}`);
       return false;
     }
+  })();
 
-    const { Translation } = await import('@capacitor-mlkit/translation');
-    mlKitStatus.set('downloading', 'Çeviri motoru test ediliyor...');
-
-    // 6 saniye içinde çevirirse model hazır
-    const result = await withTimeout(
-      Translation.translate({ text: 'Hello', sourceLanguage: 'en', targetLanguage: 'tr' }),
-      6000
-    );
-
-    if (result?.text && result.text !== 'Hello') {
-      modelReady = true;
-      mlKitStatus.set('ready', `Hazır ✓ (${result.text})`);
-      return true;
-    } else {
-      mlKitStatus.set('error', 'Model henüz hazır değil (Play Services indiriyor)');
-      return false;
-    }
-  } catch (err) {
-    // Model indirilmemiş — Play Services arka planda halleder
-    mlKitStatus.set('error', 'Model henüz hazır değil — web çeviri kullanılıyor');
-    console.warn('[MLKit] Model not ready:', err?.message);
-    return false;
-  }
+  return downloadPromise;
 };
 
 /**
- * Haberleri arka planda sessizce çevirir.
- * Sadece model hazırsa çalışır.
+ * Haberleri arka planda sessizce çevirir ve cache'e yazar.
  */
 export const backgroundTranslateNews = async (newsItems) => {
   if (!newsItems || newsItems.length === 0) return;
@@ -84,7 +134,7 @@ export const backgroundTranslateNews = async (newsItems) => {
   pruneTranslationCache();
 
   const ready = await ensureMLKitModelReady();
-  if (!ready) return; // Model yoksa geç — translationService fallback halleder
+  if (!ready) return;
 
   try {
     const { Translation } = await import('@capacitor-mlkit/translation');
@@ -100,12 +150,13 @@ export const backgroundTranslateNews = async (newsItems) => {
       try {
         const result = await withTimeout(
           Translation.translate({ text: title, sourceLanguage: 'en', targetLanguage: 'tr' }),
-          5000
+          8000,
+          'bg-translate'
         );
         if (result?.text && result.text !== title) {
           await setCachedTranslation(title, result.text);
         }
-        await new Promise(r => setTimeout(r, 30));
+        await new Promise(r => setTimeout(r, 50));
       } catch { /* bu haberi atla */ }
     }
   } catch (err) {
