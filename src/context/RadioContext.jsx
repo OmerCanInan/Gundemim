@@ -89,7 +89,7 @@ export const RadioProvider = ({ children }) => {
       .replace(/\{\{.*?\}\}/g, '')        // {{Kaynak}} etiketlerini kaldır
       .replace(/\*\*/g, '')               // Kalın yazıları kaldır
       .replace(/###/g, '')                // Başlık işaretlerini kaldır
-      
+
       // Kelime Değişimleri
       .replace(/\bAI\b/g, 'Yapay Zeka')
       .replace(/\bGPT\b/g, 'Ci-pi-ti')
@@ -111,6 +111,7 @@ export const RadioProvider = ({ children }) => {
       .replace(/\bStreaming\b/gi, 'Stríming')
       .replace(/\bBlockchain\b/gi, 'Blokçeyn')
       .replace(/\bBitcoin\b/gi, 'Bit-koyn')
+      .replace(/\bMerasim\b/gi, 'Me-rasim')
       .replace(/\bCrypto\b/gi, 'Kripto')
       .replace(/\bNvidia\b/gi, 'Envidiya')
       .replace(/\bAMD\b/g, 'A-me-de')
@@ -160,6 +161,9 @@ export const RadioProvider = ({ children }) => {
       .replace(/\bReuters\b/gi, 'Royters')
       .replace(/\bAssociated Press\b/gi, 'Asosiyeytıd Pres')
       .replace(/\bBloomberght\b/gi, 'Blumberg Ha-Te')
+      .replace(/\bOppo\b/gi, 'Oppo')
+      .replace(/\bPad\b/gi, 'Ped')
+      .replace(/\bPro\b/gi, 'Pı-ro')
       .replace(/\bBloomberg\b/gi, 'Blumberg')
       .replace(/[*#•]/g, '');
   };
@@ -170,24 +174,16 @@ export const RadioProvider = ({ children }) => {
       return;
     }
 
+    if (!isPlayingRef.current) return;
+
+    // UI Senkronizasyonu: Index'i tam ses başlamadan hemen önce ayarla
     setCurrentIndex(index);
     const item = list[index];
-
-    let finalTitle = item.title;
-    // Çeviri servisini kullan (Eğer çevirilmiş hali yoksa)
-    // Not: translationService.js içindeki translateTextToTurkish ML Kit + Fallback destekliyor.
-    try {
-      const { translateTextToTurkish } = await import('../services/translationService');
-      finalTitle = await translateTextToTurkish(item.title);
-    } catch (err) {
-      console.warn("Radyo çeviri hatası:", err);
-    }
 
     if (!isPlayingRef.current) return;
 
     // Sadece haberi oku, kaynağı okuma (Kullanıcı isteği)
-    const fullSpeechText = sanitizeForAudio(finalTitle + ".");
-
+    const fullSpeechText = sanitizeForAudio(item.title + ".");
 
     const goNext = () => {
       setTimeout(() => {
@@ -284,7 +280,7 @@ export const RadioProvider = ({ children }) => {
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
       try {
         const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
-        await TextToSpeech.stop().catch(() => {});
+        await TextToSpeech.stop().catch(() => { });
       } catch (e) {
         console.warn('[Radio] Native stop failed:', e);
       }
@@ -301,7 +297,7 @@ export const RadioProvider = ({ children }) => {
       googleTtsRef.current.src = "";
       googleTtsRef.current = null;
     }
-    
+
     console.log('[Radio] Tüm ses işlemleri durduruldu.');
   };
 

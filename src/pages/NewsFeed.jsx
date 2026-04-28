@@ -63,6 +63,7 @@ export default function NewsFeed() {
   const { 
     isPlaying: isPlayingRadio, 
     currentIndex: currentPlayingIndex, 
+    currentItem,
     startRadio, 
     stopRadio, 
     sanitizeForAudio,
@@ -547,16 +548,7 @@ export default function NewsFeed() {
 
   const handleCloseAiModal = () => {
     setIsAiModalOpen(false);
-    if (isPlayingAiAudio) {
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-        if (googleTtsRef.current) { 
-          googleTtsRef.current.pause(); 
-          googleTtsRef.current.src = ""; 
-          googleTtsRef.current = null; 
-        }
-        setIsPlayingAiAudio(false);
-        isPlayingAiRef.current = false;
-    }
+    // Artık modal kapanınca sesi durdurmuyoruz, kullanıcı dinlemeye devam edebilir.
   };
 
   // --- RADYO MANTIĞI (GLOBAL CONTEXT'E BAĞLI) ---
@@ -1290,12 +1282,12 @@ export default function NewsFeed() {
                 <div key={item.id} style={{
                   position: 'relative',
                   borderRadius: '12px',
-                  boxShadow: isPlayingRadio && currentPlayingIndex === index ? '0 0 0 3px var(--primary-color)' : 'none',
-                  transform: isPlayingRadio && currentPlayingIndex === index ? 'scale(1.02)' : 'scale(1)',
+                  boxShadow: isPlayingRadio && currentItem?.link === item.link ? '0 0 0 3px var(--primary-color)' : 'none',
+                  transform: isPlayingRadio && currentItem?.link === item.link ? 'scale(1.02)' : 'scale(1)',
                   transition: 'all 0.3s ease-in-out',
-                  zIndex: isPlayingRadio && currentPlayingIndex === index ? 10 : 1
+                  zIndex: isPlayingRadio && currentItem?.link === item.link ? 10 : 1
                 }}>
-                  {isPlayingRadio && currentPlayingIndex === index && (
+                  {isPlayingRadio && currentItem?.link === item.link && (
                     <div style={{ position: 'absolute', top: '-10px', left: '-10px', background: 'var(--primary-color)', color: 'white', padding: '0.2rem 0.5rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', zIndex: 11, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <Headphones size={12} /> Okunuyor
                     </div>
@@ -1318,6 +1310,58 @@ export default function NewsFeed() {
           )}
         </div>
       )}
+      {/* AI SESLİ OKUMA MİNİ PLAYER (Sol Alt Köşe) */}
+      {isPlayingAiAudio && (
+        <div className="fade-in" style={{
+          position: 'fixed', bottom: '2rem', left: '2rem', zIndex: 1000,
+          background: 'rgba(16, 185, 129, 0.95)', color: 'white',
+          padding: '0.8rem 1.2rem', borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', gap: '1rem',
+          border: '1px solid rgba(255,255,255,0.2)',
+          animation: 'slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <div className="pulse-animation" style={{ background: 'white', borderRadius: '50%', padding: '6px' }}>
+              <Bot size={18} color="#10b981" />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 'bold', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Özeti Okunuyor</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: '600' }}>{pageTitle}</div>
+            </div>
+          </div>
+          <button 
+            onClick={handleToggleAiAudio}
+            style={{
+              background: 'rgba(0,0,0,0.2)', border: 'none', color: 'white',
+              width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.4)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
+          >
+            <Square size={14} fill="currentColor" />
+          </button>
+        </div>
+      )}
+
+      {/* Global Stil Animasyonları */}
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .pulse-animation {
+          box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+          animation: pulse-white 2s infinite;
+        }
+        @keyframes pulse-white {
+          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+          70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+      `}</style>
     </div>
   );
 }
