@@ -1,85 +1,89 @@
 // src/services/translationService.js
-// Çeviri servisi: Cache → ML Kit → LibreTranslate zinciri
-// ML Kit modeli uygulama açılışında önceden indirilir (mlKitService.js tarafından).
+// Çeviri zinciri: Cache → Electron IPC → ML Kit → MyMemory (ücretsiz, API key gerektirmez)
+//
+// LibreTranslate public instance'ları (libretranslate.de) 403 döndürebiliyor.
+// MyMemory API: https://mymemory.translated.net — günde 5000 kelime ücretsiz, key gerekmez.
 
 import { getCachedTranslation, setCachedTranslation } from './translationCacheService';
 
-const LIBRE_ENDPOINTS = [
-  'https://libretranslate.de/translate',
-  'https://de.libretranslate.com/translate',
-  'https://translate.terraprint.co/translate'
-];
+// MyMemory — ücretsiz, API key gerektirmez, CORS sorunu yok (CapacitorHttp ile)
+const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
 
 /**
- * ML Kit ile çeviri (Native only) — 8 saniyelik timeout ile
+ * ML Kit ile çeviri (Native only) — 8 saniyelik timeout
  */
 const translateWithMLKit = async (text) => {
   try {
     if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return null;
     const { Translation } = await import('@capacitor-mlkit/translation');
 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('ML Kit timeout')), 8000)
-    );
-    const translatePromise = Translation.translate({
-      text,
-      sourceLanguage: 'en',
-      targetLanguage: 'tr',
-    });
-
-    const result = await Promise.race([translatePromise, timeoutPromise]);
+    const result = await Promise.race([
+      Translation.translate({ text, sourceLanguage: 'en', targetLanguage: 'tr' }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('ML Kit timeout')), 8000))
+    ]);
     return result?.text || null;
   } catch (err) {
-    console.warn('[MLKit] Translation failed/timeout:', err?.message || err);
+    console.warn('[MLKit] Çeviri başarısız:', err?.message);
     return null;
   }
 };
 
-
 /**
- * CapacitorHttp ile LibreTranslate çağrısı
+ * MyMemory API ile çeviri — CapacitorHttp veya fetch
  */
-const fetchWithCapacitor = async (endpoint, text) => {
+const translateWithMyMemory = async (text) => {
+  const url = `${MYMEMORY_URL}?q=${encodeURIComponent(text)}&langpair=en|tr`;
+
   try {
-    const { CapacitorHttp } = window.Capacitor.Plugins;
-    const response = await CapacitorHttp.post({
-      url: endpoint,
-      headers: { 'Content-Type': 'application/json' },
-      data: { q: text, source: 'auto', target: 'tr', format: 'text' },
-      connectTimeout: 5000,
-      readTimeout: 5000,
-    });
-    if (response.status === 200 && response.data?.translatedText) {
-      return response.data.translatedText;
+    // Mobil: CapacitorHttp (CORS bypass)
+    if (window.Capacitor?.Plugins?.CapacitorHttp) {
+      const response = await window.Capacitor.Plugins.CapacitorHttp.get({
+        url,
+        connectTimeout: 6000,
+        readTimeout: 6000,
+      });
+      if (response.status === 200) {
+        const translated = response.data?.responseData?.translatedText;
+        if (translated && response.data?.responseStatus === 200) return translated;
+      }
+      return null;
     }
+
+    // Web/Electron: normal fetch
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(tid);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.responseStatus === 200) return data?.responseData?.translatedText || null;
+    return null;
   } catch (err) {
-    console.warn(`[CapacitorHttp] Failed for ${endpoint}:`, err);
+    console.warn('[MyMemory] Çeviri başarısız:', err?.message);
+    return null;
   }
-  return null;
 };
 
 /**
- * Ana çeviri fonksiyonu.
- * Sıra: Cache → Desktop IPC → ML Kit → LibreTranslate
- * @param {string} text
- * @returns {Promise<string>}
+ * Ana çeviri fonksiyonu
+ * Sıra: Cache → Electron IPC → ML Kit → MyMemory
  */
 export const translateTextToTurkish = async (text) => {
   if (!text || text.trim() === '') return text;
 
-  // 1. CACHE — Anında döner
+  // 1. Cache — Anında döner
   const cached = await getCachedTranslation(text);
   if (cached) return cached;
 
   let result = null;
 
-  // 2. Desktop (Electron) IPC
+  // 2. Electron IPC (masaüstü)
   if (window.electronAPI && typeof window.electronAPI.translateText === 'function') {
     try {
-      const translated = await window.electronAPI.translateText(text, 'tr');
-      if (translated) result = translated;
+      const t = await window.electronAPI.translateText(text, 'tr');
+      if (t) result = t;
     } catch (err) {
-      console.warn('[DesktopTranslate] IPC Bridge failed:', err);
+      console.warn('[DesktopTranslate] IPC başarısız:', err);
     }
   }
 
@@ -88,28 +92,9 @@ export const translateTextToTurkish = async (text) => {
     result = await translateWithMLKit(text);
   }
 
-  // 4. Fallback: LibreTranslate (sadece 1 endpoint, 5sn timeout)
+  // 4. MyMemory fallback (tüm platformlar)
   if (!result) {
-    const endpoint = LIBRE_ENDPOINTS[0];
-    if (window.Capacitor?.Plugins?.CapacitorHttp) {
-      result = await fetchWithCapacitor(endpoint, text);
-    } else {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ q: text, source: 'auto', target: 'tr', format: 'text' }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const data = await res.json();
-          result = data?.translatedText || null;
-        }
-      } catch { /* sessizce geç */ }
-    }
+    result = await translateWithMyMemory(text);
   }
 
   // Başarılıysa cache'e kaydet

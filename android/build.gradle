@@ -1,16 +1,15 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+// Top-level build file
 
 buildscript {
-    
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:9.1.1'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
+        // AGP 9.1.1 → 8.7.2
+        // Sebebi: @capacitor-mlkit/translation plugininin kendi build.gradle'i
+        // AGP 8.7.2 kullanıyor. 9.x ile subproject çakışması oluyor.
+        classpath 'com.android.tools.build:gradle:8.7.2'
     }
 }
 
