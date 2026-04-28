@@ -11,20 +11,27 @@ const LIBRE_ENDPOINTS = [
 ];
 
 /**
- * ML Kit ile çeviri (Native only)
+ * ML Kit ile çeviri (Native only) — 8 saniyelik timeout ile
  */
 const translateWithMLKit = async (text) => {
   try {
     if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return null;
     const { Translation, Language } = await import('@capacitor-mlkit/translation');
-    const result = await Translation.translate({
+
+    // Timeout: Model hazır değilse sonsuza kadar beklemeyelim
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('ML Kit timeout')), 8000)
+    );
+    const translatePromise = Translation.translate({
       text,
       sourceLanguage: Language.English,
       targetLanguage: Language.Turkish,
     });
+
+    const result = await Promise.race([translatePromise, timeoutPromise]);
     return result?.text || null;
   } catch (err) {
-    console.warn('[MLKit] Translation failed:', err);
+    console.warn('[MLKit] Translation failed/timeout:', err?.message || err);
     return null;
   }
 };
