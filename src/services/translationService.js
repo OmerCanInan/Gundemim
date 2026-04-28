@@ -16,16 +16,15 @@ const LIBRE_ENDPOINTS = [
 const translateWithMLKit = async (text) => {
   try {
     if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return null;
-    const { Translation, Language } = await import('@capacitor-mlkit/translation');
+    const { Translation } = await import('@capacitor-mlkit/translation');
 
-    // Timeout: Model hazır değilse sonsuza kadar beklemeyelim
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('ML Kit timeout')), 8000)
     );
     const translatePromise = Translation.translate({
       text,
-      sourceLanguage: Language.English,
-      targetLanguage: Language.Turkish,
+      sourceLanguage: 'en',
+      targetLanguage: 'tr',
     });
 
     const result = await Promise.race([translatePromise, timeoutPromise]);
@@ -35,6 +34,7 @@ const translateWithMLKit = async (text) => {
     return null;
   }
 };
+
 
 /**
  * CapacitorHttp ile LibreTranslate çağrısı

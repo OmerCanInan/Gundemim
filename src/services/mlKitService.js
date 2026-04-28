@@ -1,21 +1,19 @@
 // src/services/mlKitService.js
-// ML Kit çeviri modelini uygulama açılışında sessizce indirir.
-// Model indirildikten sonra arka planda haberleri çevirir ve cache'e yazar.
+// Strateji: downloadModel() YOK.
+// Önce direkt çeviri dene (Play Services zaten modeli arka planda yönetir).
+// Başarısızsa web fallback'e bırak — asla takılma.
 
 import { getCachedTranslation, setCachedTranslation, pruneTranslationCache } from './translationCacheService';
 
-// Global model durumu — uygulama genelinde erişilebilir
 export const mlKitStatus = {
-  state: 'idle',       // 'idle' | 'downloading' | 'ready' | 'error'
+  state: 'idle',
   message: '',
   listeners: new Set(),
-
   set(newState, newMessage = '') {
     this.state = newState;
     this.message = newMessage;
     this.listeners.forEach(fn => fn({ state: newState, message: newMessage }));
   },
-
   subscribe(fn) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -23,107 +21,73 @@ export const mlKitStatus = {
 };
 
 let modelReady = false;
-let downloadPromise = null;
+let modelChecked = false; // Bir kez kontrol et, tekrar deneme
+
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms)
+    )
+  ]);
 
 /**
- * ML Kit en-tr modelini indirir (eğer henüz indirilmemişse).
+ * ML Kit modelinin çalışıp çalışmadığını kontrol et.
+ * downloadModel() ÇAĞIRMAZ — sadece translate() dener.
+ * Play Services modeli arka planda zaten yönetir.
  */
 export const ensureMLKitModelReady = async () => {
   if (modelReady) return true;
-  if (downloadPromise) return downloadPromise;
+  if (modelChecked) return false; // Zaten denendi ve başarısız
 
-  downloadPromise = (async () => {
-    try {
-      if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
-        mlKitStatus.set('error', 'Sadece mobilde çalışır');
-        return false;
-      }
+  modelChecked = true;
 
-      const { Translation, Language } = await import('@capacitor-mlkit/translation');
-
-      mlKitStatus.set('downloading', 'Çeviri modeli indiriliyor...');
-
-      // Model zaten var mı kontrol et (try-catch ile — bazı sürümlerde bu metod yok)
-      try {
-        const { models } = await Translation.getDownloadedModels();
-        const hasEnglish = models.some(m => m.language === Language.English || m.language === 'en');
-        const hasTurkish = models.some(m => m.language === Language.Turkish || m.language === 'tr');
-
-        if (hasEnglish && hasTurkish) {
-          modelReady = true;
-          mlKitStatus.set('ready', 'Çeviri motoru hazır ✓');
-          return true;
-        }
-      } catch {
-        // getDownloadedModels desteklenmiyorsa direkt indirmeye geç
-        console.warn('[MLKit] getDownloadedModels desteklenmiyor, model indiriliyor...');
-      }
-
-      // Modelleri indir
-      mlKitStatus.set('downloading', 'İngilizce dil paketi indiriliyor...');
-      try {
-        await Translation.downloadModel({ language: Language.English });
-      } catch (e) {
-        // İndirme başarısız olursa dur — hata yutma
-        console.error('[MLKit] İngilizce model indirme BAŞARISIZ:', e);
-        mlKitStatus.set('error', `İngilizce model indirilemedi: ${e?.message || e}`);
-        return false;
-      }
-
-      mlKitStatus.set('downloading', 'Türkçe dil paketi indiriliyor...');
-      try {
-        await Translation.downloadModel({ language: Language.Turkish });
-      } catch (e) {
-        console.error('[MLKit] Türkçe model indirme BAŞARISIZ:', e);
-        mlKitStatus.set('error', `Türkçe model indirilemedi: ${e?.message || e}`);
-        return false;
-      }
-
-
-      // Test çevirisi yap — model gerçekten çalışıyor mu?
-      mlKitStatus.set('downloading', 'Model test ediliyor...');
-      const testResult = await Translation.translate({
-        text: 'Hello',
-        sourceLanguage: Language.English,
-        targetLanguage: Language.Turkish,
-      });
-
-      if (testResult?.text) {
-        modelReady = true;
-        mlKitStatus.set('ready', `Çeviri motoru hazır ✓ (Test: "${testResult.text}")`);
-        return true;
-      } else {
-        mlKitStatus.set('error', 'Model yüklendi ama test başarısız');
-        return false;
-      }
-
-    } catch (err) {
-      console.warn('[MLKit] Model indirme başarısız:', err);
-      mlKitStatus.set('error', `İndirme hatası: ${err?.message || err}`);
+  try {
+    if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
+      mlKitStatus.set('error', 'Sadece mobilde çalışır');
       return false;
     }
-  })();
 
-  return downloadPromise;
+    const { Translation } = await import('@capacitor-mlkit/translation');
+    mlKitStatus.set('downloading', 'Çeviri motoru test ediliyor...');
+
+    // 6 saniye içinde çevirirse model hazır
+    const result = await withTimeout(
+      Translation.translate({ text: 'Hello', sourceLanguage: 'en', targetLanguage: 'tr' }),
+      6000
+    );
+
+    if (result?.text && result.text !== 'Hello') {
+      modelReady = true;
+      mlKitStatus.set('ready', `Hazır ✓ (${result.text})`);
+      return true;
+    } else {
+      mlKitStatus.set('error', 'Model henüz hazır değil (Play Services indiriyor)');
+      return false;
+    }
+  } catch (err) {
+    // Model indirilmemiş — Play Services arka planda halleder
+    mlKitStatus.set('error', 'Model henüz hazır değil — web çeviri kullanılıyor');
+    console.warn('[MLKit] Model not ready:', err?.message);
+    return false;
+  }
 };
 
 /**
- * Haberleri arka planda sessizce çevirir ve cache'e yazar.
+ * Haberleri arka planda sessizce çevirir.
+ * Sadece model hazırsa çalışır.
  */
 export const backgroundTranslateNews = async (newsItems) => {
   if (!newsItems || newsItems.length === 0) return;
-  const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
-  if (!isNative) return;
+  if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return;
 
   pruneTranslationCache();
 
   const ready = await ensureMLKitModelReady();
-  if (!ready) return;
-
-  console.log(`[MLKit] ${newsItems.length} haber arka planda çevriliyor...`);
+  if (!ready) return; // Model yoksa geç — translationService fallback halleder
 
   try {
-    const { Translation, Language } = await import('@capacitor-mlkit/translation');
+    const { Translation } = await import('@capacitor-mlkit/translation');
     const turkishPattern = /[çÇğĞışİöÖşŞüÜ]|(\b(ve|bir|bu|ile|için|de|da|den|dan)\b)/i;
 
     for (const item of newsItems) {
@@ -134,15 +98,14 @@ export const backgroundTranslateNews = async (newsItems) => {
       if (cached) continue;
 
       try {
-        const result = await Translation.translate({
-          text: title,
-          sourceLanguage: Language.English,
-          targetLanguage: Language.Turkish,
-        });
+        const result = await withTimeout(
+          Translation.translate({ text: title, sourceLanguage: 'en', targetLanguage: 'tr' }),
+          5000
+        );
         if (result?.text && result.text !== title) {
           await setCachedTranslation(title, result.text);
         }
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 30));
       } catch { /* bu haberi atla */ }
     }
   } catch (err) {
