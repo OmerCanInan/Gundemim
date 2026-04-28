@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, startTransition } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { fetchRssFeed, generateTags } from '../services/rssService';
 import { getRssLinks, getNewsCache, saveNewsItems, getFilters, saveFilters, getAppSettings, getViewSettings, saveViewSettings } from '../services/dbService';
+import { backgroundTranslateNews } from '../services/mlKitService';
 import { useRadio } from '../context/RadioContext';
 import { summarizeNewsWithGemini } from '../services/aiService';
 import NewsCard from '../components/NewsCard';
@@ -325,6 +326,8 @@ export default function NewsFeed() {
                     if (items && items.length > 0) {
                       await saveNewsItems(items);
                       scheduleNewsUpdate();
+                      // Arka planda sessizce çevir (mobil only, UI'ı bloklamaz)
+                      backgroundTranslateNews(items);
                     }
                 }
                 return { status: 'fulfilled', url: linkObj.url };

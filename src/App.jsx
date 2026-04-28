@@ -11,12 +11,24 @@ import Legal from './pages/Legal';
 
 import { useEffect, useState } from 'react';
 import { getAppSettings, clearNewsCache } from './services/dbService';
+import { ensureMLKitModelReady } from './services/mlKitService';
 import { AlertTriangle } from 'lucide-react';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHowToUseOpen, setIsHowToUseOpen] = useState(false);
   const [pcNotification, setPcNotification] = useState(null);
+
+  // Mobil: ML Kit modelini uygulama açılışında sessizce indir
+  useEffect(() => {
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      window.__mlKitBgRunning = true;
+      ensureMLKitModelReady(); // Fire-and-forget, UI'ı bloklamaz
+    }
+    return () => {
+      window.__mlKitBgRunning = false; // Uygulama kapanınca arka plan durur
+    };
+  }, []);
 
   // PC (Electron) Bildirim Dinleyicisi
   useEffect(() => {
