@@ -139,21 +139,42 @@ export default function NewsCard({ news, onTagClick, activeTag }) {
       </div>
 
       <div className="card-content">
-        {/* ML Kit Durum Badge'i */}
+        {/* ML Kit Durum Badge'i — Profesyonel Görünüm */}
         {showMLBadge && (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontSize: '0.65rem', fontWeight: '700',
-            color: mlBadgeColor,
-            background: `${mlBadgeColor}18`,
-            border: `1px solid ${mlBadgeColor}44`,
-            borderRadius: '20px', padding: '2px 8px',
-            marginBottom: '6px'
-          }}>
-            <span>{mlBadgeIcon}</span>
-            <span>{mlStatus.state === 'downloading' ? mlStatus.message || 'Çeviri motoru indiriliyor...' : mlStatus.state === 'error' ? `Hata: ${mlStatus.message}` : 'Çeviri motoru bekleniyor'}</span>
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (mlStatus.state === 'idle' || mlStatus.state === 'error') {
+                ensureMLKitModelReady();
+              }
+            }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              fontSize: '0.65rem', fontWeight: '800',
+              color: mlBadgeColor,
+              background: `${mlBadgeColor}12`,
+              border: `1px solid ${mlBadgeColor}33`,
+              borderRadius: '20px', padding: '3px 10px',
+              marginBottom: '8px',
+              cursor: (mlStatus.state === 'idle' || mlStatus.state === 'error') ? 'pointer' : 'default',
+              transition: 'all 0.2s ease',
+              width: 'fit-content'
+            }}
+          >
+            {mlStatus.state === 'downloading' ? (
+              <div className="ml-badge-content">
+                <span className="ml-spinner"></span>
+                <span>{mlStatus.message || 'İndiriliyor...'}</span>
+              </div>
+            ) : (
+              <div className="ml-badge-content">
+                <span style={{ marginRight: '4px' }}>{mlBadgeIcon}</span>
+                <span>{mlStatus.state === 'error' ? `Hata: ${mlStatus.message}` : mlStatus.state === 'ready' ? 'Hazır ✓' : 'Çeviriyi İndir'}</span>
+              </div>
+            )}
           </div>
         )}
+
         <h3 className="card-title">{displayTitle}</h3>
         <p className="card-date">
           {formattedDate} &bull; <span className="card-source">{sourceDomain}</span>

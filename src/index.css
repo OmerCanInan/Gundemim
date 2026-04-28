@@ -809,9 +809,32 @@ h4 {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  animation: notificationEnter 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  position: relative;
-  overflow: hidden;
+
+/* ML Kit Badge & Spinner */
+.ml-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: ml-spin 0.8s linear infinite;
+  margin-right: 6px;
+}
+
+@keyframes ml-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ml-badge-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 14px;
+}
+
+.ml-badge-content.ready {
+  color: var(--primary-color);
 }
 
 .pc-notification.exit {
