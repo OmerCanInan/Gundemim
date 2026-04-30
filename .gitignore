@@ -28,6 +28,7 @@ dist_app
 pack
 
 # Android / iOS Secrets
+key.properties
 android/key.properties
 *.jks
 

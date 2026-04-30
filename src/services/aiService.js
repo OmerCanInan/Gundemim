@@ -8,7 +8,7 @@ let cachedModelId = null;
  * Verilen RSS haber nesnelerini (Title + Description) alıp Groq API'ye
  * gönderir ve genel bir özet metni döndürür.
  */
-export const summarizeNewsWithGemini = async (newsItems, category = 'Genel Haberler') => {
+export const summarizeNewsWithGroq = async (newsItems, category = 'Genel Haberler') => {
   const apiKey = await getGroqApiKey();
   if (!apiKey) {
     throw new Error('Lütfen Gündem (Ayarlar) sekmesinden Groq API anahtarınızı girin.');

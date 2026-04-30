@@ -10,9 +10,9 @@ import HowToUseDrawer from './components/HowToUseDrawer';
 import Legal from './pages/Legal';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { getAppSettings, clearNewsCache } from './services/dbService';
+import { getAppSettings, getNewsCache } from './services/dbService';
 import FirstLaunchSetup from './components/FirstLaunchSetup';
-import TranslationProgressBar from './components/TranslationProgressBar';
+import { backgroundTranslateNews } from './services/mlKitService';
 import { AlertTriangle } from 'lucide-react';
 
 function App() {
@@ -60,24 +60,31 @@ function App() {
     };
   }, [handleTouchStart, handleTouchEnd]);
 
-  // İlk açılışta ML Kit Setup ekranı kontrolü
+  // İlk açılışta ML Kit Setup ekranı kontrolü + arka plan çevirisi
   useEffect(() => {
-    // Biraz gecikmeli kontrol yapalım ki Capacitor objesi kesin yüklenmiş olsun
-    setTimeout(() => {
+    setTimeout(async () => {
       const isMobile = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
       const hasDoneSetup = localStorage.getItem('gundemim_mlkit_setup_done');
-      
+
       if (isMobile && !hasDoneSetup) {
         setIsSetupOpen(true);
       } else {
-        // Eğer setup ekranı açılmayacaksa, rehberi kontrol et
+        // Rehber kontrolü
         const hasSeenOnboarding = localStorage.getItem('gundemim_first_start');
         if (!hasSeenOnboarding) {
           setIsHowToUseOpen(true);
           localStorage.setItem('gundemim_first_start', 'done');
         }
+
+        // Her açılışta: model hazırsa cache'deki haberleri çevir
+        if (isMobile) {
+          const cached = getNewsCache();
+          if (cached.length > 0) {
+            backgroundTranslateNews(cached);
+          }
+        }
       }
-    }, 500);
+    }, 800);
   }, []);
 
   // PC (Electron) Bildirim Dinleyicisi
@@ -102,19 +109,10 @@ function App() {
       document.documentElement.setAttribute('data-theme-layout', settings.layoutStrategy || 'grid');
       document.documentElement.setAttribute('data-theme', settings.colorTheme || 'dark');
     };
-    
-    // --- TEK SEFERLİK CACHE TEMİZLİĞİ (Kullanıcı İsteği) ---
-    const hasWiped = sessionStorage.getItem('gundemim_cache_wiped');
-    if (!hasWiped) {
-      clearNewsCache();
-      sessionStorage.setItem('gundemim_cache_wiped', 'true');
-      console.warn("Önbellek (Cache) temizlendi - Yeni kurallarla başlanıyor.");
-    }
 
-    applySettings(); // İlk yüklemede çalıştır
-    window.addEventListener('rss_settings_updated', applySettings); // İçeriden tetiklendiğinde güncellesin
+    applySettings();
+    window.addEventListener('rss_settings_updated', applySettings);
     
-    // Global Yardım Çekmecesi Dinleyicisi
     const handleToggleHowToUse = () => setIsHowToUseOpen(prev => !prev);
     window.addEventListener('toggle_how_to_use', handleToggleHowToUse);
 
@@ -200,7 +198,6 @@ function AppContent({ isSidebarOpen, setIsSidebarOpen, isHowToUseOpen, setIsHowT
       )}
 
       <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-      <TranslationProgressBar />
       <div className="app-body">
         <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
         

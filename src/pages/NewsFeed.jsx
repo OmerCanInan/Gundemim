@@ -6,7 +6,7 @@ import { fetchRssFeed, generateTags } from '../services/rssService';
 import { getRssLinks, getNewsCache, saveNewsItems, getFilters, saveFilters, getAppSettings, getViewSettings, saveViewSettings } from '../services/dbService';
 import { backgroundTranslateNews } from '../services/mlKitService';
 import { useRadio } from '../context/RadioContext';
-import { summarizeNewsWithGemini } from '../services/aiService';
+import { summarizeNewsWithGroq } from '../services/aiService';
 import NewsCard from '../components/NewsCard';
 import { ArrowLeft, Loader2, RefreshCw, ShieldAlert, Target, Sparkles, Bot, Headphones, Square, Tag, Key, HelpCircle } from 'lucide-react';
 
@@ -532,7 +532,7 @@ export default function NewsFeed() {
     setAiError(null);
     setAiSummary(null);
     try {
-      const summaryText = await summarizeNewsWithGemini(displayedNews, pageTitle);
+      const summaryText = await summarizeNewsWithGroq(displayedNews, pageTitle);
       setAiSummary(summaryText);
     } catch (err) {
       setAiError(err.message);
@@ -726,7 +726,7 @@ export default function NewsFeed() {
           </div>
         </div>
         
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="feed-actions-bar" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             onClick={handleOpenAiModal}
             title="Haberlerin yapay zeka özetini okuyun"
@@ -802,7 +802,7 @@ export default function NewsFeed() {
           )}
 
           {/* Ses Cinsiyet Seçimi */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <div className="voice-gender-selector" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <div style={{ 
               display: 'flex', alignItems: 'center', gap: 0,
               borderRadius: '8px', overflow: 'hidden',

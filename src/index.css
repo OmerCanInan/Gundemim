@@ -369,6 +369,8 @@ h4 {
   top: 0;
   z-index: 100;
   transition: background-color 0.3s ease, border-color 0.3s ease;
+  /* Safe area: Notch / Status bar desteği */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .navbar-container {
@@ -604,8 +606,13 @@ h4 {
 
 /* RESPONSIVE DESIGN (MOBILE & TABLET - ONLY MOBILE OVERRIDES) */
 @media (max-width: 1024px) {
+  /* Safe area padding - Notch, Status Bar, Gesture Bar */
+  .app-container {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .navbar-container {
-    padding: 0.6rem 1rem; /* Slightly tighter navbar */
+    padding: 0.6rem 1rem;
   }
 
   /* Logo Scaling on Mobile */
@@ -617,25 +624,22 @@ h4 {
     height: 20px !important;
   }
   .navbar-logo h1 {
-    font-size: 1rem !important; /* Slightly smaller for narrow screens */
+    font-size: 1rem !important;
   }
 
-  /* AI Modal Mobile Optimization */
-  .news-feed-container [style*="max-width: 700px"] {
-    max-width: 95% !important;
-    max-height: 90vh !important;
-    border-radius: 12px !important;
+  /* Çeviri butonu - yazı görünsün, küçük boyutlu */
+  .toggle-button {
+    padding: 0.45rem 0.8rem !important;
+    border-radius: 8px !important;
+    font-size: 0.78rem !important;
+    gap: 0.35rem !important;
+  }
+  .toggle-button svg {
+    width: 15px !important;
+    height: 15px !important;
   }
 
-  .news-feed-container [style*="padding: 1.5rem"] {
-    padding: 1rem !important; /* Less padding on small screens */
-  }
-
-  .news-feed-container [style*="font-size: 1.2rem"] {
-    font-size: 1.1rem !important;
-  }
-
-  /* Hamburger Toggle Scaling & Colors */
+  /* Hamburger Toggle */
   .mobile-menu-toggle {
     display: flex !important;
     padding: 6px !important;
@@ -643,24 +647,102 @@ h4 {
     background: transparent !important;
     border: none !important;
     color: var(--text-color) !important;
+    min-width: 36px;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
   }
   .mobile-menu-toggle svg {
     width: 22px !important;
     height: 22px !important;
   }
 
-  /* Translation Button Scaling */
-  .toggle-button {
-    padding: 0.4rem 0.7rem !important;
-    font-size: 0.75rem !important;
-    gap: 0.4rem !important;
-  }
-  .toggle-button svg {
-    width: 14px !important;
-    height: 14px !important;
+  /* AI Modal Mobile */
+  .news-feed-container [style*="max-width: 700px"] {
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    border-radius: 12px !important;
   }
 
-  /* Premium Mobile Sidebar Drawer Fixes */
+  .news-feed-container [style*="padding: 1.5rem"] {
+    padding: 1rem !important;
+  }
+
+  .news-feed-container [style*="font-size: 1.2rem"] {
+    font-size: 1.1rem !important;
+  }
+
+  /* Mobil Ana İçerik */
+  .main-content {
+    padding: 1rem 0.75rem !important;
+    width: 100% !important;
+  }
+
+  /* Haber grid → tek sütun */
+  .news-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .news-card {
+    border-radius: 10px !important;
+  }
+
+  .card-image-container {
+    height: 180px !important;
+  }
+
+  .card-content {
+    padding: 0.85rem !important;
+  }
+  
+  .card-title {
+    font-size: 1rem !important;
+    line-height: 1.4 !important;
+  }
+
+  .card-description {
+    font-size: 0.85rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .read-more-button {
+    padding: 0.75rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Haber feed header - mobilde dikey */
+  .feed-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  /* Aksiyon butonları - sarmalı, kompakt */
+  .feed-actions-bar {
+    width: 100% !important;
+    gap: 0.5rem !important;
+    flex-wrap: wrap !important;
+  }
+  .feed-actions-bar > button {
+    flex: 1 1 auto !important;
+    font-size: 0.8rem !important;
+    padding: 0.45rem 0.7rem !important;
+    height: 36px !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+  }
+  .feed-actions-bar > div {
+    flex: 0 0 auto !important;
+  }
+
+  /* Mobilde ses cinsiyet seçimini gizle */
+  .voice-gender-selector {
+    display: none !important;
+  }
+
+  /* Sidebar Drawer */
   .sidebar {
     position: fixed !important;
     top: 0 !important;
@@ -668,15 +750,14 @@ h4 {
     width: 300px !important;
     height: 100vh !important;
     z-index: 2000 !important;
-    pointer-events: none !important; /* CRITICAL: Prevent blocking content clicks when closed */
+    pointer-events: none !important;
     background-color: var(--bg-secondary) !important;
-    padding: calc(env(safe-area-inset-top, 0px) + 3rem) 1.5rem 1.5rem !important; /* Fixed: Added top margin for title */
+    padding: calc(env(safe-area-inset-top, 0px) + 3rem) 1.5rem 1.5rem !important;
     box-shadow: 20px 0 60px rgba(0, 0, 0, 0.7) !important;
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
     flex-shrink: 0 !important;
   }
 
-  /* Allow pointer events ONLY when open */
   .sidebar.open {
     transform: translateX(320px) !important;
     pointer-events: auto !important;
@@ -692,42 +773,6 @@ h4 {
     backdrop-filter: blur(4px) !important;
     z-index: 1999 !important;
     animation: fadeIn 0.3s ease !important;
-  }
-
-  .main-content {
-    padding: 1.25rem 0.8rem !important;
-    width: 100% !important;
-  }
-
-  .news-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem !important;
-  }
-
-  .news-card {
-    border-radius: 8px !important;
-  }
-
-  .card-image-container {
-    height: 160px !important; /* Tighter for mobile */
-  }
-
-  .card-content {
-    padding: 1rem !important;
-  }
-  
-  .card-title {
-    font-size: 1.05rem !important;
-  }
-
-  .card-description {
-    font-size: 0.85rem !important;
-    margin-bottom: 1rem !important;
-  }
-
-  .read-more-button {
-    padding: 0.75rem !important; /* Better touch target */
-    font-size: 0.85rem !important;
   }
 
   .mobile-only {
@@ -746,7 +791,7 @@ h4 {
     gap: 0.8rem !important;
   }
 
-  /* Mobil Klasör Silme / Düzenleme Butonları (Her zaman görünür) */
+  /* Mobil Klasör Silme / Düzenle Butonları */
   .sidebar-edit-btn {
     opacity: 1 !important;
   }

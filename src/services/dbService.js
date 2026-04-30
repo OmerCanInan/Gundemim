@@ -149,11 +149,42 @@ export const getNewsCache = () => {
 };
 
 /**
+ * HTML etiketlerini temizler ve metni belirtilen uzunlukta keser.
+ * Kullanıcının news card'da görebildiği kadar metin saklanır, fazlası hafızayı şişirirdi.
+ */
+const sanitizeNewsItem = (item) => {
+  const stripHtml = (str) => {
+    if (!str) return '';
+    return str
+      .replace(/<[^>]*>/g, ' ')  // HTML etiketlerini boşlukla değiştir
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/\s+/g, ' ')       // Birden fazla boşluğu tek boşluğa indir
+      .trim();
+  };
+
+  const desc = stripHtml(item.description || '');
+  return {
+    ...item,
+    // Açıklamayı sadece görünür kısım kadar sakla (300 karakter yeterli)
+    description: desc.length > 300 ? desc.substring(0, 300) : desc,
+    // Görsel ve kaynak URL'leri zaten kısa, title da kısa. Sadece description şişiriyor.
+  };
+};
+
+/**
  * Yeni çekilen canlı feed'leri alır, eskileri ve tekrarları atarak LocalStorage'a kaydeder.
  * Bu fonksiyon "Otomatik Temizlik (Garbage Collection)" içerir.
  */
 export const saveNewsItems = (newItems) => {
   let cached = getNewsCache();
+
+  // 0. SANITIZE: HTML temizle ve description'ı kes (5MB limiti koruması)
+  newItems = newItems.map(sanitizeNewsItem);
 
   // 1. ÇÖP TOPLAYICI (Garbage Collection): 3 Günden eski cache'leri hukuken ve depolama için at.
   const cutoffTime = new Date().getTime() - (CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
@@ -237,34 +268,76 @@ export const saveFilters = (filters) => {
 // ==========================================
 // YAPAY ZEKA (AI) AYARLARI (GROQ)
 // ==========================================
+
+const GROQ_KEY_PREF = 'groq_api_key'; // Capacitor Preferences key
+
+/**
+ * Gro API anahtarını getirir.
+ * Öncelik: Electron IPC (masaüstü) → Capacitor Preferences (mobil) → localStorage (fallback)
+ */
 export const getGroqApiKey = async () => {
-  // Audit: Encryption support for API Keys
+  // 1. Electron (masaüstü): şifreli sistem depolaması
   if (window.electronAPI && typeof window.electronAPI.getApiKey === 'function') {
     try {
       const secureKey = await window.electronAPI.getApiKey();
       if (secureKey) return secureKey;
     } catch (err) {
-      console.error("Secure key retrieval failed:", err);
+      console.error('[GroqKey] Electron IPC failed:', err);
     }
   }
+
+  // 2. Capacitor Preferences (Android / iOS native)
+  const isMobile = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  if (isMobile) {
+    try {
+      const { Preferences } = await import('@capacitor/preferences');
+      const { value } = await Preferences.get({ key: GROQ_KEY_PREF });
+      if (value) return value;
+    } catch (err) {
+      console.warn('[GroqKey] Capacitor Preferences okuma hatası:', err);
+    }
+  }
+
+  // 3. localStorage (web / fallback / migration)
   return localStorage.getItem('rss_groq_api_key') || '';
 };
 
+/**
+ * Groq API anahtarını kaydeder.
+ * Öncelik: Electron IPC → Capacitor Preferences → localStorage
+ */
 export const saveGroqApiKey = async (key) => {
   const cleanKey = key?.trim() || '';
 
-  // Audit: Encrypt key in Electron environment
+  // 1. Electron (masaüstü)
   if (window.electronAPI && typeof window.electronAPI.saveApiKey === 'function') {
     try {
       await window.electronAPI.saveApiKey(cleanKey);
-      // Clean up localStorage if it existed
-      localStorage.removeItem('rss_groq_api_key');
+      localStorage.removeItem('rss_groq_api_key'); // Eski kaydı temizle
       return;
     } catch (err) {
-      console.error("Secure key save failed:", err);
+      console.error('[GroqKey] Electron IPC save failed:', err);
     }
   }
 
+  // 2. Capacitor Preferences (Android / iOS native)
+  const isMobile = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  if (isMobile) {
+    try {
+      const { Preferences } = await import('@capacitor/preferences');
+      if (cleanKey) {
+        await Preferences.set({ key: GROQ_KEY_PREF, value: cleanKey });
+      } else {
+        await Preferences.remove({ key: GROQ_KEY_PREF });
+      }
+      localStorage.removeItem('rss_groq_api_key'); // Varsa eski localStorage kaydını sil
+      return;
+    } catch (err) {
+      console.warn('[GroqKey] Capacitor Preferences kaydetme hatası:', err);
+    }
+  }
+
+  // 3. localStorage (web fallback)
   if (cleanKey) {
     localStorage.setItem('rss_groq_api_key', cleanKey);
   } else {
