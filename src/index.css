@@ -458,7 +458,135 @@ h4 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
+
+/* --- Satır başına kart sayısı (data-cards-per-row) --- */
+/* Varsayılan: 2 sütun */
+:root[data-theme-layout="grid"][data-cards-per-row="2"] .news-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 4 sütun */
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .news-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* 6 sütun */
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .news-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+/* 8 sütun */
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .news-grid {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+/* 4+ sütunda başlık boyutunu küçült */
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .card-title {
+  font-size: 0.95rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-bottom: 0.4rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .card-title {
+  font-size: 0.85rem;
+  line-height: 1.3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-bottom: 0.3rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .card-title {
+  font-size: 0.75rem;
+  line-height: 1.25;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-bottom: 0.2rem;
+}
+
+/* 4+ sütunda resim yüksekliğini küçült */
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .card-image-container {
+  height: 140px;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .card-image-container {
+  height: 100px;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .card-image-container {
+  height: 80px;
+}
+
+/* 4+ sütunda açıklamayı daha kısa tut ve küçült */
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .card-description {
+  font-size: 0.82rem;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-bottom: 1rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .card-description {
+  font-size: 0.75rem;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-bottom: 0.75rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .card-description {
+  font-size: 0.65rem;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  margin-bottom: 0.5rem;
+}
+
+/* Tarih ve Kaynak (Etiketler) Kademeli Küçültme */
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .card-date {
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .card-date {
+  font-size: 0.65rem;
+  margin-bottom: 0.4rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .card-date {
+  font-size: 0.55rem;
+  margin-bottom: 0.3rem;
+  flex-wrap: wrap;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .card-source {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.3rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .card-source,
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .card-source {
+  font-size: 0.55rem;
+  padding: 0.1rem 0.2rem;
+}
+
+/* Buton ve Padding Kademeli Küçültme */
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .card-content {
+  padding: 1rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .card-content {
+  padding: 0.75rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .card-content {
+  padding: 0.5rem;
+}
+
+:root[data-theme-layout="grid"][data-cards-per-row="4"] .read-more-button {
+  font-size: 0.8rem;
+  padding: 0.5rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="6"] .read-more-button {
+  font-size: 0.7rem;
+  padding: 0.4rem;
+}
+:root[data-theme-layout="grid"][data-cards-per-row="8"] .read-more-button {
+  font-size: 0.6rem;
+  padding: 0.3rem;
+}
+
 
 /* --- News Card (Klasik Gazete Stili) --- */
 .news-card {

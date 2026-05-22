@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { getRssLinks, addRssLink, deleteRssLink, updateFolderName, getGroqApiKey, saveGroqApiKey, getAppSettings, saveAppSettings } from '../services/dbService';
 import { importOPML, exportOPML } from '../services/opmlService';
-import { Search, Globe, Trash2, PlusCircle, Folder, Download, Upload, Compass, Rss, ShieldAlert, Target, Sparkles, Key, ExternalLink, Settings, Type, LayoutGrid, LayoutList, Sun, Moon, CheckCircle, AlertCircle, Volume2, Play, HelpCircle, Edit2, Check, X } from 'lucide-react';
+import { Search, Globe, Trash2, PlusCircle, Folder, Download, Upload, Compass, Rss, ShieldAlert, Target, Sparkles, Key, ExternalLink, Settings, Type, LayoutGrid, LayoutList, Sun, Moon, CheckCircle, AlertCircle, Volume2, Play, HelpCircle, Edit2, Check, X, Columns2, Columns3, Columns4 } from 'lucide-react';
 
 // Önerilen kaynaklar listesi ayrı bir "Discover" (Keşfet) sayfasına taşındı.
 
@@ -508,6 +508,52 @@ export default function Home() {
                      ><LayoutList size={16} /> Alt Alta Liste</button>
                   </div>
                </div>
+
+               {/* Sütun Sayısı (sadece Izgara modunda) */}
+               {appSettings.layoutStrategy === 'grid' && (
+               <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600', marginBottom: '0.8rem', color: 'var(--text-light)', fontSize: '0.95rem' }}>
+                     <Columns2 size={16} /> Satır Başına Kart Sayısı
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                     {[2, 4, 6, 8].map(n => {
+                       const isActive = (appSettings.cardsPerRow || 2) === n;
+                       const icons = { 2: <Columns2 size={15} />, 4: <Columns2 size={15} />, 6: <Columns3 size={15} />, 8: <Columns4 size={15} /> };
+                       return (
+                         <button
+                           key={n}
+                           onClick={() => handleSettingChange('cardsPerRow', n)}
+                           title={`${n} kart yan yana`}
+                           style={{
+                             flex: 1,
+                             display: 'flex',
+                             flexDirection: 'column',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             gap: '0.35rem',
+                             padding: '0.7rem 0.5rem',
+                             background: isActive ? 'var(--primary-color)' : 'var(--bg-color)',
+                             color: isActive ? 'var(--bg-color)' : 'var(--text-color)',
+                             border: isActive ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                             borderRadius: '8px',
+                             cursor: 'pointer',
+                             transition: 'all 0.2s',
+                             fontWeight: isActive ? '800' : '500',
+                             fontSize: '0.9rem',
+                             boxShadow: isActive ? '0 4px 12px rgba(52,211,153,0.3)' : 'none',
+                           }}
+                         >
+                           {icons[n]}
+                           {n}
+                         </button>
+                       );
+                     })}
+                  </div>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-light)', opacity: 0.6, fontStyle: 'italic' }}>
+                     * Mobil ekranlarda her zaman tek sütun gösterilir.
+                  </p>
+               </div>
+               )}
 
                {/* Sesli Okuma Hızı */}
                <div style={{ gridColumn: '1 / -1', paddingTop: '1rem', borderTop: '1px dashed var(--border-color)' }}>

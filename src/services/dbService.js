@@ -351,9 +351,10 @@ export const saveGroqApiKey = async (key) => {
 export const getAppSettings = () => {
   try {
     const data = localStorage.getItem('rss_app_settings');
-    return data ? JSON.parse(data) : { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0 };
+    const defaults = { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0, cardsPerRow: 2 };
+    return data ? { ...defaults, ...JSON.parse(data) } : defaults;
   } catch {
-    return { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0 };
+    return { fontTheme: 'mix', layoutStrategy: 'grid', colorTheme: 'dark', playbackRate: 1.0, cardsPerRow: 2 };
   }
 };
 

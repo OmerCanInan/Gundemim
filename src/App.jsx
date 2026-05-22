@@ -108,6 +108,7 @@ function App() {
       document.documentElement.setAttribute('data-theme-font', settings.fontTheme || 'mix');
       document.documentElement.setAttribute('data-theme-layout', settings.layoutStrategy || 'grid');
       document.documentElement.setAttribute('data-theme', settings.colorTheme || 'dark');
+      document.documentElement.setAttribute('data-cards-per-row', String(settings.cardsPerRow || 2));
     };
 
     applySettings();
