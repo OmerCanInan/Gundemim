@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiKey: () => ipcRenderer.invoke('get-api-key'),
   translateText: (text, lang) => ipcRenderer.invoke('translate-text', text, lang),
 
+  // Update check
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
+
   // PC Bildirimlerini dinlemek için (Listener sızıntısı önlendi)
   onPcNotification: (callback) => {
     const subscription = (_event, value) => callback(value);

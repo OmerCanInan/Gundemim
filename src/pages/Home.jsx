@@ -515,36 +515,55 @@ export default function Home() {
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600', marginBottom: '0.8rem', color: 'var(--text-light)', fontSize: '0.95rem' }}>
                      <Columns2 size={16} /> Satır Başına Kart Sayısı
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem' }}>
                      {[2, 4, 6, 8].map(n => {
                        const isActive = (appSettings.cardsPerRow || 2) === n;
-                       const icons = { 2: <Columns2 size={15} />, 4: <Columns2 size={15} />, 6: <Columns3 size={15} />, 8: <Columns4 size={15} /> };
+                       const icons = { 
+                         2: <Columns2 size={20} strokeWidth={isActive ? 2.5 : 1.5} />, 
+                         4: <Columns2 size={20} strokeWidth={isActive ? 2.5 : 1.5} />, 
+                         6: <Columns3 size={20} strokeWidth={isActive ? 2.5 : 1.5} />, 
+                         8: <Columns4 size={20} strokeWidth={isActive ? 2.5 : 1.5} /> 
+                       };
                        return (
                          <button
                            key={n}
                            onClick={() => handleSettingChange('cardsPerRow', n)}
                            title={`${n} kart yan yana`}
                            style={{
-                             flex: 1,
                              display: 'flex',
                              flexDirection: 'column',
                              alignItems: 'center',
                              justifyContent: 'center',
-                             gap: '0.35rem',
-                             padding: '0.7rem 0.5rem',
+                             gap: '0.3rem',
+                             padding: '0.6rem 0.4rem',
                              background: isActive ? 'var(--primary-color)' : 'var(--bg-color)',
-                             color: isActive ? 'var(--bg-color)' : 'var(--text-color)',
-                             border: isActive ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                             color: isActive ? '#fff' : 'var(--text-color)',
+                             border: isActive ? '2px solid var(--primary-color)' : '2px solid var(--border-color)',
                              borderRadius: '8px',
                              cursor: 'pointer',
-                             transition: 'all 0.2s',
-                             fontWeight: isActive ? '800' : '500',
-                             fontSize: '0.9rem',
-                             boxShadow: isActive ? '0 4px 12px rgba(52,211,153,0.3)' : 'none',
+                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                             fontWeight: isActive ? '800' : '600',
+                             fontSize: '1rem',
+                             boxShadow: isActive ? '0 4px 10px rgba(16, 185, 129, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)',
+                             transform: isActive ? 'translateY(-2px) scale(1.02)' : 'none'
+                           }}
+                           onMouseOver={(e) => {
+                             if(!isActive) {
+                               e.currentTarget.style.borderColor = 'var(--primary-color)';
+                               e.currentTarget.style.transform = 'translateY(-2px)';
+                               e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)';
+                             }
+                           }}
+                           onMouseOut={(e) => {
+                             if(!isActive) {
+                               e.currentTarget.style.borderColor = 'var(--border-color)';
+                               e.currentTarget.style.transform = 'none';
+                               e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+                             }
                            }}
                          >
                            {icons[n]}
-                           {n}
+                           <span>{n}</span>
                          </button>
                        );
                      })}
@@ -612,6 +631,39 @@ export default function Home() {
                         <Play size={16} fill="currentColor" /> Hızı Test Et
                      </button>
                   </div>
+               </div>
+
+               {/* Güncelleme Kontrolü */}
+               <div style={{ gridColumn: '1 / -1', paddingTop: '1.5rem', borderTop: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', color: 'var(--text-color)' }}>
+                       <Download size={18} color="var(--primary-color)" /> Uygulama Güncellemesi
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>Yeni bir sürüm olup olmadığını kontrol edin.</p>
+                  </div>
+                  <button 
+                     onClick={async () => {
+                        if (window.electronAPI?.checkUpdate) {
+                           showToast('Güncellemeler kontrol ediliyor...', 'info');
+                           const res = await window.electronAPI.checkUpdate();
+                           if (res && res.error) {
+                             showToast(res.error, 'error');
+                           }
+                        } else {
+                           showToast('Güncelleme kontrolü sadece PC uygulamasında çalışır.', 'error');
+                        }
+                     }}
+                     style={{ 
+                        display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.5rem', 
+                        background: 'var(--bg-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)', 
+                        borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem',
+                        transition: 'all 0.2s'
+                     }}
+                     onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.color = 'var(--primary-color)'; }}
+                     onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-color)'; }}
+                  >
+                     <Target size={16} /> Güncellemeleri Kontrol Et
+                  </button>
                </div>
 
             </div>

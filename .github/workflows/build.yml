@@ -40,7 +40,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-assets
-          path: pack/*.exe
+          path: |
+            pack/*.exe
+            pack/*.yml
+            pack/*.blockmap
 
   # ==========================================
   # ANDROID BUILD (APK)

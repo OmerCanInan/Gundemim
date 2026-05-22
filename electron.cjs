@@ -7,6 +7,21 @@ try {
 }
 const path = require('path');
 
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
+
+let win = null;
+
+app.on('second-instance', () => {
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
+});
+
 // --- CONSTANTS ---
 const LOAD_GRACE_PERIOD_MS = 3000;
 const REDIRECT_DELAY_MS = 100;
@@ -200,11 +215,82 @@ app.on('web-contents-created', (event, contents) => {
 app.whenReady().then(() => {
   createWindow();
 
-  // Yalnızca paketlenmiş (production) sürümde güncellemeleri kontrol et
-  if (!isDev && autoUpdater) {
-    console.log('[Electron] Checking for updates...');
-    autoUpdater.checkForUpdatesAndNotify().catch(err => {
-      console.warn('[Electron] Update check failed:', err);
+  if (autoUpdater) {
+    console.log('[Electron] Setting up auto updater...');
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('checking-for-update', () => {
+      if (win) {
+        win.webContents.send('show-pc-notification', {
+          title: 'Güncelleme',
+          message: 'Güncellemeler kontrol ediliyor...',
+          type: 'info'
+        });
+      }
+    });
+
+    autoUpdater.on('update-available', (info) => {
+      if (win) {
+        win.webContents.send('show-pc-notification', {
+          title: 'Güncelleme Bulundu',
+          message: 'Yeni bir sürüm indiriliyor...',
+          detail: `Sürüm ${info.version}`,
+          type: 'info'
+        });
+      }
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      if (win) {
+        win.webContents.send('show-pc-notification', {
+          title: 'Güncelsiniz',
+          message: 'Şu an en güncel sürümü kullanıyorsunuz.',
+          type: 'success'
+        });
+      }
+    });
+
+    autoUpdater.on('error', (err) => {
+      if (win) {
+        win.webContents.send('show-pc-notification', {
+          title: 'Güncelleme Hatası',
+          message: 'Güncellemeler kontrol edilirken bir hata oluştu.',
+          detail: err == null ? 'Bilinmeyen Hata' : (err.stack || err).toString(),
+          type: 'error'
+        });
+      }
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      if (win) {
+        win.webContents.send('show-pc-notification', {
+          title: 'Güncelleme İndirildi',
+          message: 'Yeni sürüm kuruluma hazır.',
+          detail: 'Uygulamayı kapattığınızda otomatik olarak yüklenecektir.',
+          type: 'success'
+        });
+      }
+    });
+
+    if (!isDev) {
+      console.log('[Electron] Checking for updates on startup...');
+      autoUpdater.checkForUpdatesAndNotify().catch(err => {
+        console.warn('[Electron] Update check failed:', err);
+      });
+    }
+
+    ipcMain.handle('check-update', async () => {
+      try {
+        if(isDev) {
+          // Geliştirici modunda test için uyarı
+          return { error: 'Geliştirici modunda güncelleme kontrolü yapılamaz. Lütfen uygulamayı build alıp test edin.' };
+        }
+        await autoUpdater.checkForUpdatesAndNotify();
+        return { success: true };
+      } catch (err) {
+        return { error: err.message };
+      }
     });
   }
 
