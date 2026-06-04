@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Update check
   checkUpdate: () => ipcRenderer.invoke('check-update'),
 
+  // Harici tarayıcıda aç (son çare fallback)
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // Electron içinde yeni pencere aç (Google Translate vb.)
+  openInWindow: (url, title) => ipcRenderer.invoke('open-in-window', url, title),
+
   // PC Bildirimlerini dinlemek için (Listener sızıntısı önlendi)
   onPcNotification: (callback) => {
     const subscription = (_event, value) => callback(value);

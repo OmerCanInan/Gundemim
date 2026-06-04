@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, net } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, net, session } = require('electron');
 let autoUpdater;
 try {
   autoUpdater = require('electron-updater').autoUpdater;
@@ -140,11 +140,19 @@ ipcMain.handle('fetch-rss', async (event, url, timeoutMs = 20000) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(targetUrl, { 
+      const response = await net.fetch(targetUrl, { 
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-          'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Sec-Ch-Ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Upgrade-Insecure-Requests': '1'
         }
       });
       clearTimeout(timeoutId);
@@ -189,6 +197,36 @@ ipcMain.handle('translate-text', async (event, text, targetLang = 'tr') => {
   }
   
   return text; // Return original text if translation fails
+});
+
+// IPC: Harici tarayıcıda aç (NewsCard fallback son aşama)
+ipcMain.handle('open-external', async (event, url) => {
+  if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+    await shell.openExternal(url);
+    return { success: true };
+  }
+  return { success: false, error: 'Geçersiz URL' };
+});
+
+// IPC: Electron içinde yeni pencere aç (Google Translate vb.)
+ipcMain.handle('open-in-window', async (event, url, title) => {
+  if (typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+    return { success: false, error: 'Geçersiz URL' };
+  }
+  const child = new BrowserWindow({
+    width: 1100,
+    height: 800,
+    title: title || 'Gündemim',
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false, // Google Translate iframe'lerin çalışması için
+    }
+  });
+  child.loadURL(url);
+  child.once('ready-to-show', () => child.show());
+  return { success: true };
 });
 
 app.userAgentFallback = "Gundemim/1.1 (RSS Reader; +https://github.com/OmerCanInan/Gundemim)";
