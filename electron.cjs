@@ -253,7 +253,24 @@ const getUpdateState = () => {
 
 ipcMain.handle('quit-and-install', () => {
   if (autoUpdater) {
-    autoUpdater.quitAndInstall();
+    setImmediate(() => {
+      // 1. Remove listeners that might prevent the app from quitting
+      app.removeAllListeners('window-all-closed');
+      app.removeAllListeners('before-quit');
+
+      // 2. Destroy all windows aggressively to release any file locks immediately
+      BrowserWindow.getAllWindows().forEach((w) => {
+        try {
+          w.removeAllListeners('close');
+          w.destroy();
+        } catch (e) {
+          console.error('[Update] Failed to destroy window:', e);
+        }
+      });
+
+      // 3. Quit and launch the installer
+      autoUpdater.quitAndInstall(false, true);
+    });
     return { success: true };
   }
   return { success: false, error: 'autoUpdater not initialized' };
