@@ -33,11 +33,49 @@ export default function Sidebar({ isOpen, closeSidebar }) {
     return () => window.removeEventListener('rss_db_updated', updateFolders);
   }, [location.pathname, location.search]);
 
+  // Destek çekmecesi kapatıldığında formu ve durumu sıfırla
+  useEffect(() => {
+    if (!isSupportOpen) {
+      setSupportState('idle');
+      setSupportForm({ email: '', subject: '', message: '' });
+    }
+  }, [isSupportOpen]);
+
   const isActive = (path, search = '') => location.pathname === path && location.search === search;
   const isFolderActive = (folderName) => location.pathname === '/news' && location.search === `?folder=${encodeURIComponent(folderName)}`;
 
   const handleSupportSubmit = async (e) => {
-    // ... same as before
+    e.preventDefault();
+    setSupportState('sending');
+
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: '491a6741-ac9b-4107-b15d-9e3f5463656a',
+          name: 'Gündemim Uygulaması Destek Talebi',
+          email: supportForm.email,
+          subject: supportForm.subject,
+          message: supportForm.message
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSupportState('success');
+      } else {
+        throw new Error(result.message || 'Gönderim başarısız.');
+      }
+    } catch (error) {
+      console.error('Destek formu gönderim hatası:', error);
+      alert('Destek talebi gönderilirken bir sorun oluştu. Lütfen daha sonra tekrar deneyin veya doğrudan omer1243a@gmail.com adresine yazın.');
+      setSupportState('idle');
+    }
   };
 
   const handleRename = (e, oldName) => {

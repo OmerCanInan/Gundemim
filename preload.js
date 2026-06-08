@@ -12,6 +12,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Update check
   checkUpdate: () => ipcRenderer.invoke('check-update'),
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  getUpdateState: () => ipcRenderer.invoke('get-update-state'),
+  onUpdateStatusChanged: (callback) => {
+    const subscription = (_event, value) => callback(value);
+    ipcRenderer.on('update-status-changed', subscription);
+    return () => {
+      ipcRenderer.removeListener('update-status-changed', subscription);
+    };
+  },
 
   // Harici tarayıcıda aç (son çare fallback)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

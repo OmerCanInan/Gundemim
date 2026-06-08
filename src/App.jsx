@@ -13,7 +13,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { getAppSettings, getNewsCache } from './services/dbService';
 import FirstLaunchSetup from './components/FirstLaunchSetup';
 import { backgroundTranslateNews } from './services/mlKitService';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Download, X, CheckCircle, RefreshCw } from 'lucide-react';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -143,6 +143,29 @@ function App() {
 function AppContent({ isSidebarOpen, setIsSidebarOpen, isHowToUseOpen, setIsHowToUseOpen, isSetupOpen, setIsSetupOpen, pcNotification }) {
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // --- OTOMATİK GÜNCELLEME STATE & LİSTENERS ---
+  const [updateState, setUpdateState] = useState(null);
+  const [hideBanner, setHideBanner] = useState(false);
+
+  useEffect(() => {
+    if (window.electronAPI) {
+      if (typeof window.electronAPI.getUpdateState === 'function') {
+        window.electronAPI.getUpdateState().then(state => {
+          if (state && state.status && state.status !== 'idle') {
+            setUpdateState(state);
+          }
+        });
+      }
+      if (typeof window.electronAPI.onUpdateStatusChanged === 'function') {
+        const cleanup = window.electronAPI.onUpdateStatusChanged((state) => {
+          setUpdateState(state);
+          setHideBanner(false); // Yeni durum geldiğinde banner'ı tekrar göster
+        });
+        return () => cleanup();
+      }
+    }
+  }, []);
 
   // --- SCROLL RESET (Tepeden Başlatma) ---
   useEffect(() => {
@@ -165,6 +188,98 @@ function AppContent({ isSidebarOpen, setIsSidebarOpen, isHowToUseOpen, setIsHowT
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      
+      {/* Otomatik Güncelleme Bildirim Şeridi (Banner) */}
+      {updateState && updateState.status && updateState.status !== 'idle' && !hideBanner && (
+        <div className={`update-banner ${updateState.status}`} style={{
+          background: updateState.status === 'downloaded' ? 'var(--primary-color)' : 'var(--bg-secondary)',
+          color: updateState.status === 'downloaded' ? 'var(--bg-color)' : 'var(--text-color)',
+          padding: '0.8rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid var(--border-color)',
+          fontSize: '0.9rem',
+          gap: '1rem',
+          zIndex: 10000,
+          position: 'relative',
+          transition: 'all 0.3s'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+            {updateState.status === 'downloading' ? (
+              <RefreshCw size={18} className="spin" style={{ animation: 'spin 2s linear infinite', flexShrink: 0 }} />
+            ) : updateState.status === 'downloaded' ? (
+              <CheckCircle size={18} style={{ flexShrink: 0 }} />
+            ) : (
+              <Download size={18} style={{ flexShrink: 0 }} />
+            )}
+            
+            {updateState.status === 'checking' && <span>Güncellemeler kontrol ediliyor...</span>}
+            {updateState.status === 'available' && <span>Yeni güncelleme mevcut. İndirme başlatılıyor...</span>}
+            {updateState.status === 'downloading' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', minWidth: 0 }}>
+                <span style={{ whiteSpace: 'nowrap' }}>Yeni sürüm indiriliyor: %{Math.round(updateState.progress || 0)}</span>
+                <div style={{ flex: 1, height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', maxWidth: '300px' }}>
+                  <div style={{ width: `${updateState.progress || 0}%`, height: '100%', background: 'var(--primary-color)' }}></div>
+                </div>
+              </div>
+            )}
+            {updateState.status === 'downloaded' && (
+              <span style={{ fontWeight: 'bold' }}>Gündemim v{updateState.version} hazır!</span>
+            )}
+            {updateState.status === 'error' && (
+              <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Güncelleme hatası: {updateState.error}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexShrink: 0 }}>
+            {updateState.status === 'downloaded' && (
+              <button 
+                onClick={() => {
+                  if (window.electronAPI?.quitAndInstall) {
+                    window.electronAPI.quitAndInstall();
+                  }
+                }}
+                style={{
+                  background: 'var(--bg-color)',
+                  color: 'var(--text-color)',
+                  border: 'none',
+                  padding: '0.4rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '0.82rem',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.opacity = 0.9}
+                onMouseOut={(e) => e.currentTarget.style.opacity = 1}
+              >
+                Kur ve Yeniden Başlat
+              </button>
+            )}
+            <button 
+              onClick={() => setHideBanner(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 0.7
+              }}
+              onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+              onMouseOut={(e) => e.currentTarget.style.opacity = 0.7}
+              title="Kapat"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Premium PC Bildirim Paneli */}
       {pcNotification && (

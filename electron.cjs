@@ -229,6 +229,40 @@ ipcMain.handle('open-in-window', async (event, url, title) => {
   return { success: true };
 });
 
+// --- GÜNCELLEME DURUM DOSYASI YÖNETİMİ ---
+const updateStatePath = path.join(app.getPath('userData'), 'updatestate.json');
+
+const saveUpdateState = (state) => {
+  try {
+    fs.writeFileSync(updateStatePath, JSON.stringify(state));
+  } catch (err) {
+    console.error('[UpdateState] Failed to save state:', err);
+  }
+};
+
+const getUpdateState = () => {
+  try {
+    if (fs.existsSync(updateStatePath)) {
+      return JSON.parse(fs.readFileSync(updateStatePath, 'utf8'));
+    }
+  } catch (err) {
+    console.error('[UpdateState] Failed to read state:', err);
+  }
+  return { status: 'idle', updateAvailable: false };
+};
+
+ipcMain.handle('quit-and-install', () => {
+  if (autoUpdater) {
+    autoUpdater.quitAndInstall();
+    return { success: true };
+  }
+  return { success: false, error: 'autoUpdater not initialized' };
+});
+
+ipcMain.handle('get-update-state', () => {
+  return getUpdateState();
+});
+
 app.userAgentFallback = "Gundemim/1.1 (RSS Reader; +https://github.com/OmerCanInan/Gundemim)";
 
 app.on('web-contents-created', (event, contents) => {
@@ -259,7 +293,10 @@ app.whenReady().then(() => {
     autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on('checking-for-update', () => {
+      const state = { status: 'checking', updateAvailable: false };
+      saveUpdateState(state);
       if (win) {
+        win.webContents.send('update-status-changed', state);
         win.webContents.send('show-pc-notification', {
           title: 'Güncelleme',
           message: 'Güncellemeler kontrol ediliyor...',
@@ -269,7 +306,10 @@ app.whenReady().then(() => {
     });
 
     autoUpdater.on('update-available', (info) => {
+      const state = { status: 'available', version: info.version, updateAvailable: true };
+      saveUpdateState(state);
       if (win) {
+        win.webContents.send('update-status-changed', state);
         win.webContents.send('show-pc-notification', {
           title: 'Güncelleme Bulundu',
           message: 'Yeni bir sürüm indiriliyor...',
@@ -280,7 +320,10 @@ app.whenReady().then(() => {
     });
 
     autoUpdater.on('update-not-available', (info) => {
+      const state = { status: 'idle', updateAvailable: false };
+      saveUpdateState(state);
       if (win) {
+        win.webContents.send('update-status-changed', state);
         win.webContents.send('show-pc-notification', {
           title: 'Güncelsiniz',
           message: 'Şu an en güncel sürümü kullanıyorsunuz.',
@@ -290,7 +333,10 @@ app.whenReady().then(() => {
     });
 
     autoUpdater.on('error', (err) => {
+      const state = { status: 'error', error: err == null ? 'Bilinmeyen Hata' : err.message || err.toString() };
+      saveUpdateState(state);
       if (win) {
+        win.webContents.send('update-status-changed', state);
         win.webContents.send('show-pc-notification', {
           title: 'Güncelleme Hatası',
           message: 'Güncellemeler kontrol edilirken bir hata oluştu.',
@@ -300,12 +346,30 @@ app.whenReady().then(() => {
       }
     });
 
-    autoUpdater.on('update-downloaded', (info) => {
+    autoUpdater.on('download-progress', (progressObj) => {
+      const state = { 
+        status: 'downloading', 
+        progress: progressObj.percent, 
+        bytesPerSecond: progressObj.bytesPerSecond,
+        transferred: progressObj.transferred,
+        total: progressObj.total,
+        updateAvailable: true
+      };
+      saveUpdateState(state);
       if (win) {
+        win.webContents.send('update-status-changed', state);
+      }
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      const state = { status: 'downloaded', version: info.version, updateAvailable: true };
+      saveUpdateState(state);
+      if (win) {
+        win.webContents.send('update-status-changed', state);
         win.webContents.send('show-pc-notification', {
           title: 'Güncelleme İndirildi',
           message: 'Yeni sürüm kuruluma hazır.',
-          detail: 'Uygulamayı kapattığınızda otomatik olarak yüklenecektir.',
+          detail: 'Kuruluma hazır! Uygulamayı kapatıp açtığınızda kurulacaktır.',
           type: 'success'
         });
       }
@@ -337,6 +401,12 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  // Kapatmadan önce son bilinen güncelleme durumunu kaydet (not al)
+  const state = getUpdateState();
+  saveUpdateState(state);
 });
 
 app.on('window-all-closed', () => {
